@@ -1,0 +1,5 @@
+# Ignorar arquivos privados
+.env
+database.sqlite
+node_modules/
+*.log
