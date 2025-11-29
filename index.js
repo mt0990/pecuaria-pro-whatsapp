@@ -1,6 +1,5 @@
 // =========================================
 // 📌 PECUÁRIA PRO - WhatsApp Bot Completo
-// Sistema Antigo + Sistema de LOTES + Nome do Usuário
 // =========================================
 
 import express from "express";
@@ -8,8 +7,10 @@ import axios from "axios";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
+// NLP
 import { detectIntent } from "./services/nlp.js";
 
+// Cálculos (não interferem com lotes)
 import {
     calcularDieta,
     custoPorArroba,
@@ -17,6 +18,7 @@ import {
     calcularLotacao
 } from "./services/cattle.js";
 
+// Extração
 import {
     extrairPesoDaMensagem,
     extrairQuantidadeDaMensagem,
@@ -24,6 +26,7 @@ import {
     extrairAreaHa
 } from "./services/extract.js";
 
+// Formatação
 import {
     formatDieta,
     formatCustoArroba,
@@ -33,23 +36,20 @@ import {
     formatMissingData
 } from "./services/formatter.js";
 
+// Banco de dados (com LOTES funcionando)
 import {
     getUser,
     createUser,
     updateUser,
     addConversation,
     getConversationHistory,
-
-    // SISTEMA ANTIGO
     createAnimal,
     getAnimalsByUser,
     updateAnimal,
     deleteAnimal,
-
-    // SISTEMA DE LOTES (NOVO)
-    addAnimalToLote,
+    getLote,
     getAllLotes,
-    getLote
+    addAnimalToLote
 } from "./database.js";
 
 dotenv.config();
@@ -60,100 +60,86 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 // =========================================
-// 🔧 MODO: ATIVAR/DESATIVAR GPT
+// 🔧 CONFIG
 // =========================================
+
 const GPT_ATIVO = true;
 
-// =========================================
-// ⛔ EVITAR MENSAGENS DUPLICADAS
-// =========================================
 const processedMessages = new Set();
-
-// =========================================
-// 🔗 CONFIG ULTRAMSG
-// =========================================
 
 const ULTRA_INSTANCE_ID = process.env.ULTRAMSG_INSTANCE_ID;
 const ULTRA_TOKEN = process.env.ULTRAMSG_TOKEN;
 const ULTRA_API_URL = process.env.ULTRAMSG_API_URL;
-
-// =========================================
-// 🤖 CONFIG OPENAI (GPT-4o-mini)
-// =========================================
 
 const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
 // =========================================
-// 📤 ENVIAR MENSAGEM PARA O WHATSAPP
+// 📤 Função universal de envio
 // =========================================
 
 async function sendMessage(phone, message) {
     try {
         await axios.post(
             `${ULTRA_API_URL}/${ULTRA_INSTANCE_ID}/messages/chat`,
-            {
-                to: phone,
-                body: message,
-                priority: "normal",
-            },
-            {
-                params: { token: ULTRA_TOKEN },
-                headers: { "Content-Type": "application/json" }
-            }
+            { to: phone, body: message },
+            { params: { token: ULTRA_TOKEN } }
         );
-
-        console.log("📤 Enviado para:", phone);
     } catch (err) {
         console.error("❌ Erro ao enviar:", err.response?.data || err);
     }
 }
 
 // =========================================
-// 🧠 SYSTEM PROMPT – COM NOME DO USUÁRIO
+// 🧠 SYSTEM PROMPT — Ajustado para LOTES
 // =========================================
+
 const systemPrompt = `
-Você é o PECUÁRIA PRO, especialista em bovinos.
-O nome do usuário é: {{userName}}
+Você é o PECUÁRIA PRO, especialista em bovinos. 
+Responda sempre curto, direto, claro e prático.
 
-Responda sempre em até 5 linhas, de forma prática e estilo WhatsApp.
-
-REGRAS IMPORTANTES:
-- Não repita informações.
-- Não invente dados.
-- Evite listas longas.
-- Se faltar informação, peça APENAS o essencial.
-
-📦 LOTES — JSON OBRIGATÓRIO para cadastro:
+⚠ Regras:
+- Nunca repetir textos.
+- Nunca explicar demais.
+- Não usar "ler mais".
+- Nunca dizer que não armazena dados.
+- Quando detectar cadastro de ANIMAL:
 {
-  "acao": "registrar_animal_lote",
-  "lote": 1,
-  "tipo": "...",
-  "raca": "...",
-  "peso": "...",
-  "idade": "...",
-  "sexo": "...",
-  "quantidade": 1,
-  "observacao": "..."
+ "acao": "registrar_animal",
+ "tipo": "",
+ "raca": "",
+ "peso": "",
+ "idade": "",
+ "sexo": "",
+ "quantidade": "",
+ "observacao": ""
 }
 
-Para listar todos os lotes:
+- Cadastro por LOTE:
+{
+ "acao": "adicionar_lote",
+ "numero_lote": "",
+ "tipo": "",
+ "raca": "",
+ "peso": "",
+ "idade": "",
+ "sexo": "",
+ "quantidade": "",
+ "observacao": ""
+}
+
+- Listar lotes:
 { "acao": "listar_lotes" }
 
-Para listar um lote específico:
-{
-  "acao": "listar_lote",
-  "lote": 1
-}
+- Listar um lote:
+{ "acao": "listar_lote", "numero_lote": "" }
 
-📌 Importante:
-• Se o usuário não mencionar "lote", use o sistema antigo de animais.
-• Pode entender linguagem natural e linguagem técnica.
+⚠ Jamais misture lotes com cálculos de dieta/UA/custo.
 `;
 
 // =========================================
-// 🌐 TESTE RÁPIDO DO WEBHOOK
+// 🌐 Webhook Teste
 // =========================================
 
 app.get("/webhook", (req, res) => {
@@ -168,279 +154,171 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(200);
 
     const data = req.body.data;
-    if (!data) return;
+    if (!data || data.type !== "chat") return;
 
-    if (data.fromMe === true) return;
-    if (["sent", "delivered", "read"].includes(data.ack)) return;
-    if (data.type !== "chat") return;
-
-    const msgId = data.id;
-    if (!msgId) return;
-
-    if (processedMessages.has(msgId)) return;
-    processedMessages.add(msgId);
+    if (data.fromMe) return;
 
     const phone = data.from.replace("@c.us", "");
-    const message = data.body || "";
+    const message = data.body?.trim() || "";
 
-    // =========================================
-    // 👤 CRIAÇÃO E ATUALIZAÇÃO DO USUÁRIO
-    // =========================================
+    // Anti duplicação
+    if (processedMessages.has(data.id)) return;
+    processedMessages.add(data.id);
 
+    // ===== Usuário
     let user = getUser(phone);
+    if (!user) createUser(phone, data.pushname);
+    updateUser(phone, { last_message: message, last_interaction: new Date().toISOString() });
 
-    if (!user) {
-        createUser(phone, data.pushname || "Cliente");
-        user = getUser(phone);
-    } else {
-        // Atualiza nome caso tenha mudado no WhatsApp
-        if (data.pushname && data.pushname !== user.name) {
-            updateUser(phone, { name: data.pushname });
-        }
-    }
-
-    updateUser(phone, {
-        last_message: message,
-        last_interaction: new Date().toISOString()
-    });
-
-    // Salvar histórico — mensagem do usuário
     addConversation(phone, "user", message);
 
-    // =========================================
-    // 🧠 DETECTAR INTENÇÃO
-    // =========================================
-
+    // ===== Intenção
     const intent = detectIntent(message);
-    console.log("🧠 INTENÇÃO:", intent);
 
-    // =========================================
-    // 🔶 SISTEMA ANTIGO – DIETA
-    // =========================================
+    // ============================
+    // Primeira camada: INTENÇÕES fixas
+    // ============================
 
+    // Dieta
     if (intent.intent === "diet") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
-
-        if (!peso)
-            return await sendMessage(phone, formatError("Informe o peso (ex.: 380kg)"));
-
-        const result = calcularDieta(peso, qtd);
-        return await sendMessage(phone, formatDieta(result, peso, qtd));
+        if (!peso) return sendMessage(phone, "Informe peso. Ex.: boi 380kg");
+        return sendMessage(phone, formatDieta(calcularDieta(peso, qtd), peso, qtd));
     }
 
-    // =========================================
-    // 🔷 SISTEMA ANTIGO – CUSTO POR ARROBA
-    // =========================================
-
-    if (intent.intent === "arroba_cost") {
-        const peso = extrairPesoDaMensagem(message);
-        const custo = extrairCustoDaMensagem(message);
-
-        if (!peso || !custo)
-            return await sendMessage(phone, formatMissingData());
-
-        const result = custoPorArroba(custo, peso);
-        return await sendMessage(phone, formatCustoArroba(result, peso, custo));
-    }
-
-    // =========================================
-    // 🔶 SISTEMA ANTIGO – UA
-    // =========================================
-
+    // UA
     if (intent.intent === "ua_calc") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
-
-        if (!peso)
-            return await sendMessage(phone, formatError("Informe o peso (ex.: 420kg)"));
-
-        const ua = calcularUA(peso);
-        const totalUA = ua * qtd;
-
-        return await sendMessage(phone, formatUA(totalUA));
+        if (!peso) return sendMessage(phone, "Informe peso. Ex.: UA boi 420kg");
+        return sendMessage(phone, formatUA(calcularUA(peso) * qtd));
     }
 
-    // =========================================
-    // 🔷 SISTEMA ANTIGO – LOTAÇÃO
-    // =========================================
-
-    if (intent.intent === "lotacao_calc") {
+    // Custo por arroba
+    if (intent.intent === "arroba_cost") {
         const peso = extrairPesoDaMensagem(message);
-        const qtd = extrairQuantidadeDaMensagem(message);
-        const area = extrairAreaHa(message);
-
-        if (!peso || !qtd || !area)
-            return await sendMessage(phone, formatMissingData());
-
-        const ua = calcularUA(peso);
-        const totalUA = ua * qtd;
-
-        const lotacao = calcularLotacao(totalUA, area);
-
-        return await sendMessage(phone, formatLotacao(lotacao));
+        const custo = extrairCustoDaMensagem(message);
+        if (!peso || !custo) return sendMessage(phone, formatMissingData());
+        return sendMessage(phone, formatCustoArroba(custoPorArroba(custo, peso), peso, custo));
     }
 
-    // =========================================
-    // 🔶 SISTEMA ANTIGO – CADASTRAR ANIMAL
-    // =========================================
-
-    if (intent.intent === "register_animal") {
-        const nome = /nome[:=]\s*([a-zA-Z0-9 ]+)/i.exec(message)?.[1];
-        const peso = /peso[:=]\s*([0-9.,]+)/i.exec(message)?.[1];
-        const idade = /idade[:=]\s*([0-9]+)/i.exec(message)?.[1];
-        const raca = /raca[:=]\s*([a-zA-Z0-9 ]+)/i.exec(message)?.[1];
-        const anotacoes = /obs[:=]\s*(.*)/i.exec(message)?.[1] || "";
-
-        if (!nome || !peso)
-            return await sendMessage(phone,
-                "🐄 Cadastro incompleto.\nExemplo:\n" +
-                "cadastrar nome: nelore, peso: 380, idade: 3, raca: gir"
-            );
-
-        createAnimal(phone, nome, raca, peso, idade, anotacoes);
-
-        return await sendMessage(phone, "🐮 Animal cadastrado com sucesso!");
-    }
-
-    // =========================================
-    // 🔷 SISTEMA ANTIGO – LISTAR ANIMAIS
-    // =========================================
-
-    if (intent.intent === "list_animals") {
-        const animais = getAnimalsByUser(phone);
-
-        if (animais.length === 0)
-            return await sendMessage(phone, "📭 Você não tem animais cadastrados.");
-
-        let texto = "🐮 *Seus Animais*\n\n";
-
-        animais.forEach(a => {
-            texto += `
-ID: *${a.id}*
-🐂 Nome: *${a.name}*
-⚖️ Peso: *${a.weight} kg*
-📅 Idade: *${a.age} anos*
-🐮 Raça: *${a.breed}*\n\n`;
-        });
-
-        return await sendMessage(phone, texto);
-    }
-
-    // =========================================
-    // 🤖 GPT FALLBACK
-    // =========================================
-
-    if (!GPT_ATIVO)
-        return await sendMessage(phone, "⚠️ GPT desativado.");
+    // ==============================
+    // GPT fallback (agora com LOTE)
+    // ==============================
 
     const history = getConversationHistory(phone, 10);
 
     const conversationMessages = [
-        {
-            role: "system",
-            content: systemPrompt.replace("{{userName}}", user.name || "Cliente")
-        },
+        { role: "system", content: systemPrompt },
         ...history.map(h => ({ role: h.role, content: h.message })),
         { role: "user", content: message }
     ];
 
-    let resposta;
+    let resposta = "";
 
     try {
         const completion = await client.chat.completions.create({
             model: "gpt-4o-mini",
-            messages: conversationMessages,
-            temperature: 0.6
+            messages: conversationMessages
         });
-
         resposta = completion.choices[0].message.content;
-    } catch (err) {
-        console.log(err);
-        return await sendMessage(phone, "❌ Erro no GPT.");
+    } catch {
+        return sendMessage(phone, "❌ Erro com GPT.");
     }
 
     // =========================================
-    // 🔍 PROCURAR JSON DO GPT
+    // TENTAR LER JSON DO GPT
     // =========================================
 
-    let jsonAcao = null;
+    let json = null;
 
     try {
-        const jsonMatch = resposta.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            jsonAcao = JSON.parse(jsonMatch[0]);
-            console.log("🔎 JSON detectado:", jsonAcao);
+        const match = resposta.match(/\{[\s\S]*\}/);
+        if (match) json = JSON.parse(match[0]);
+    } catch {}
+
+    // =========================================
+    // EXECUTAR AÇÕES DO JSON
+    // =========================================
+
+    if (json) {
+        // ---------- Registrar animal simples
+        if (json.acao === "registrar_animal") {
+
+            createAnimal(
+                phone,
+                json.tipo,
+                json.raca,
+                json.peso,
+                json.idade,
+                json.observacao || ""
+            );
+
+            return sendMessage(phone, "🐮 Animal cadastrado com sucesso!");
         }
-    } catch {
-        console.log("⚠️ JSON inválido");
-    }
 
-    // =========================================
-    // 📦 SISTEMA DE LOTES (NOVO)
-    // =========================================
-
-    if (jsonAcao) {
-
-        // 1️⃣ REGISTRAR ANIMAL EM LOTE
-        if (jsonAcao.acao === "registrar_animal_lote") {
+        // ---------- Adicionar animal a lote
+        if (json.acao === "adicionar_lote") {
 
             addAnimalToLote(
                 phone,
-                jsonAcao.lote,
-                jsonAcao.tipo,
-                jsonAcao.raca,
-                jsonAcao.peso,
-                jsonAcao.idade,
-                jsonAcao.sexo,
-                jsonAcao.quantidade,
-                jsonAcao.observacao
+                json.numero_lote,
+                json.tipo,
+                json.raca,
+                json.peso,
+                json.idade,
+                json.sexo,
+                json.quantidade,
+                json.observacao
             );
 
-            return await sendMessage(phone, `🐮 Animal registrado no lote ${jsonAcao.lote}!`);
+            return sendMessage(phone, `📦 Animal adicionado ao lote ${json.numero_lote}!`);
         }
 
-        // 2️⃣ LISTAR TODOS OS LOTES
-        if (jsonAcao.acao === "listar_lotes") {
+        // ---------- Listar todos os lotes
+        if (json.acao === "listar_lotes") {
 
             const lotes = getAllLotes(phone);
 
             if (lotes.length === 0)
-                return await sendMessage(phone, "📭 Você não tem lotes registrados.");
+                return sendMessage(phone, "📭 Você não tem lotes cadastrados.");
 
-            let texto = "📦 *Lotes Registrados:*\n\n";
-
+            let txt = "📦 *Seus lotes*\n\n";
             lotes.forEach(l => {
-                texto += `• Lote ${l.numero_lote}: ${l.total_animais} animal(is)\n`;
+                txt += `• Lote ${l.numero_lote}: ${l.total_animais} animais\n`;
             });
 
-            return await sendMessage(phone, texto);
+            return sendMessage(phone, txt);
         }
 
-        // 3️⃣ LISTAR ANIMAIS DE UM LOTE
-        if (jsonAcao.acao === "listar_lote") {
+        // ---------- Listar animais de um lote
+        if (json.acao === "listar_lote") {
 
-            const animais = getLote(phone, jsonAcao.lote);
+            const animais = getLote(phone, json.numero_lote);
 
             if (animais.length === 0)
-                return await sendMessage(phone, `📭 O lote ${jsonAcao.lote} está vazio.`);
+                return sendMessage(phone, `📭 O lote ${json.numero_lote} está vazio.`);
 
-            let texto = `📦 *Lote ${jsonAcao.lote}:*\n\n`;
+            let txt = `📦 *Lote ${json.numero_lote}*\n\n`;
 
             animais.forEach(a => {
-                texto += `🐂 ${a.tipo} (${a.raca}) — ${a.peso}, idade: ${a.idade}, sexo: ${a.sexo}\n`;
+                txt += `• ${a.tipo} (${a.raca || "sem raça"})  
+Peso: ${a.peso}  
+Qtd: ${a.quantidade}  
+Sexo: ${a.sexo}\n\n`;
             });
 
-            return await sendMessage(phone, texto);
+            return sendMessage(phone, txt);
         }
     }
 
     // =========================================
-    // 🗣️ SE NÃO TEVE JSON → RESPONDER NORMAL
+    // SE NÃO HOUVER JSON → resposta normal
     // =========================================
 
     addConversation(phone, "assistant", resposta);
-    return await sendMessage(phone, resposta);
+    return sendMessage(phone, resposta);
 });
 
 // =========================================
