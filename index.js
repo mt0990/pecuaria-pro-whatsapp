@@ -1,6 +1,6 @@
 // =========================================
 // 📌 PECUÁRIA PRO - WhatsApp Bot Completo
-// Sistema Antigo + Sistema de LOTES (Novidade)
+// Sistema Antigo + Sistema de LOTES + Nome do Usuário
 // =========================================
 
 import express from "express";
@@ -8,10 +8,8 @@ import axios from "axios";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
-// NLP (detecta intenção do usuário)
 import { detectIntent } from "./services/nlp.js";
 
-// Funções de cálculos pecuários
 import {
     calcularDieta,
     custoPorArroba,
@@ -19,7 +17,6 @@ import {
     calcularLotacao
 } from "./services/cattle.js";
 
-// Funções de EXTRAÇÃO (peso, quantidade, área, etc.)
 import {
     extrairPesoDaMensagem,
     extrairQuantidadeDaMensagem,
@@ -27,7 +24,6 @@ import {
     extrairAreaHa
 } from "./services/extract.js";
 
-// Respostas formatadas
 import {
     formatDieta,
     formatCustoArroba,
@@ -37,20 +33,20 @@ import {
     formatMissingData
 } from "./services/formatter.js";
 
-// BANCO DE DADOS (funções antigas + novos lotes)
 import {
     getUser,
     createUser,
     updateUser,
     addConversation,
     getConversationHistory,
+
+    // SISTEMA ANTIGO
     createAnimal,
     getAnimalsByUser,
-    getAnimalById,
     updateAnimal,
     deleteAnimal,
 
-    // NOVAS FUNÇÕES (LOTES)
+    // SISTEMA DE LOTES (NOVO)
     addAnimalToLote,
     getAllLotes,
     getLote
@@ -69,7 +65,7 @@ const PORT = process.env.PORT || 3000;
 const GPT_ATIVO = true;
 
 // =========================================
-// ⛔ ANTI-DUPLICAÇÃO (evita duplicar respostas)
+// ⛔ EVITAR MENSAGENS DUPLICADAS
 // =========================================
 const processedMessages = new Set();
 
@@ -82,7 +78,7 @@ const ULTRA_TOKEN = process.env.ULTRAMSG_TOKEN;
 const ULTRA_API_URL = process.env.ULTRAMSG_API_URL;
 
 // =========================================
-// 🤖 CONFIG OPENAI (GPT)
+// 🤖 CONFIG OPENAI (GPT-4o-mini)
 // =========================================
 
 const client = new OpenAI({
@@ -90,7 +86,7 @@ const client = new OpenAI({
 });
 
 // =========================================
-// 📤 FUNÇÃO PARA ENVIAR MENSAGEM WHATSAPP
+// 📤 ENVIAR MENSAGEM PARA O WHATSAPP
 // =========================================
 
 async function sendMessage(phone, message) {
@@ -115,33 +111,21 @@ async function sendMessage(phone, message) {
 }
 
 // =========================================
-// 🧠 SYSTEM PROMPT – AGORA COM LOTES
+// 🧠 SYSTEM PROMPT – COM NOME DO USUÁRIO
 // =========================================
-
-/*
-Este prompt foi ajustado para:
-
-• Responder curto e limpo
-• Não repetir
-• Não inventar
-• Atender linguagem natural e técnica
-• Usar JSON SOMENTE para LOTES
-• Sistema antigo de animais continua funcionando
-*/
-
 const systemPrompt = `
 Você é o PECUÁRIA PRO, especialista em bovinos.
-Responda em até 5 linhas. Estilo WhatsApp.
+O nome do usuário é: {{userName}}
 
-REGRAS:
-- Nada de textos longos.
-- Nada de explicações científicas.
-- Nada de inventar dados.
-- Evite bullets demais.
-- Sempre peça apenas o essencial.
+Responda sempre em até 5 linhas, de forma prática e estilo WhatsApp.
 
-📦 LOTES — JSON OBRIGATÓRIO:
-Para cadastrar um animal em um lote:
+REGRAS IMPORTANTES:
+- Não repita informações.
+- Não invente dados.
+- Evite listas longas.
+- Se faltar informação, peça APENAS o essencial.
+
+📦 LOTES — JSON OBRIGATÓRIO para cadastro:
 {
   "acao": "registrar_animal_lote",
   "lote": 1,
@@ -163,8 +147,9 @@ Para listar um lote específico:
   "lote": 1
 }
 
-📌 Importante: Para “cadastrar animal” sem mencionar lote,
-responda normalmente (sistema antigo).
+📌 Importante:
+• Se o usuário não mencionar "lote", use o sistema antigo de animais.
+• Pode entender linguagem natural e linguagem técnica.
 `;
 
 // =========================================
@@ -176,7 +161,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // =========================================
-// 📩 WEBHOOK PRINCIPAL (CORAÇÃO DO BOT)
+// 📩 WEBHOOK PRINCIPAL
 // =========================================
 
 app.post("/webhook", async (req, res) => {
@@ -199,13 +184,19 @@ app.post("/webhook", async (req, res) => {
     const message = data.body || "";
 
     // =========================================
-    // 👤 USUÁRIO NO BANCO
+    // 👤 CRIAÇÃO E ATUALIZAÇÃO DO USUÁRIO
     // =========================================
 
     let user = getUser(phone);
+
     if (!user) {
-        createUser(phone, data.pushname || null);
+        createUser(phone, data.pushname || "Cliente");
         user = getUser(phone);
+    } else {
+        // Atualiza nome caso tenha mudado no WhatsApp
+        if (data.pushname && data.pushname !== user.name) {
+            updateUser(phone, { name: data.pushname });
+        }
     }
 
     updateUser(phone, {
@@ -213,19 +204,18 @@ app.post("/webhook", async (req, res) => {
         last_interaction: new Date().toISOString()
     });
 
+    // Salvar histórico — mensagem do usuário
     addConversation(phone, "user", message);
 
     // =========================================
-    // 🧠 DETECTAR INTENÇÃO (NLP)
+    // 🧠 DETECTAR INTENÇÃO
     // =========================================
 
     const intent = detectIntent(message);
     console.log("🧠 INTENÇÃO:", intent);
 
     // =========================================
-    // 🔰 SISTEMA ANTIGO
-    // =========================================
-    // (Dietas, custo, UA, lotação, cadastro simples)
+    // 🔶 SISTEMA ANTIGO – DIETA
     // =========================================
 
     if (intent.intent === "diet") {
@@ -233,11 +223,15 @@ app.post("/webhook", async (req, res) => {
         const qtd = extrairQuantidadeDaMensagem(message);
 
         if (!peso)
-            return await sendMessage(phone, formatError("Informe o peso (ex.: boi 380kg)"));
+            return await sendMessage(phone, formatError("Informe o peso (ex.: 380kg)"));
 
         const result = calcularDieta(peso, qtd);
         return await sendMessage(phone, formatDieta(result, peso, qtd));
     }
+
+    // =========================================
+    // 🔷 SISTEMA ANTIGO – CUSTO POR ARROBA
+    // =========================================
 
     if (intent.intent === "arroba_cost") {
         const peso = extrairPesoDaMensagem(message);
@@ -250,18 +244,26 @@ app.post("/webhook", async (req, res) => {
         return await sendMessage(phone, formatCustoArroba(result, peso, custo));
     }
 
+    // =========================================
+    // 🔶 SISTEMA ANTIGO – UA
+    // =========================================
+
     if (intent.intent === "ua_calc") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
 
         if (!peso)
-            return await sendMessage(phone, formatError("Informe peso. Ex.: UA boi 420kg"));
+            return await sendMessage(phone, formatError("Informe o peso (ex.: 420kg)"));
 
-        const uaAnimal = calcularUA(peso);
-        const totalUA = uaAnimal * qtd;
+        const ua = calcularUA(peso);
+        const totalUA = ua * qtd;
 
         return await sendMessage(phone, formatUA(totalUA));
     }
+
+    // =========================================
+    // 🔷 SISTEMA ANTIGO – LOTAÇÃO
+    // =========================================
 
     if (intent.intent === "lotacao_calc") {
         const peso = extrairPesoDaMensagem(message);
@@ -280,7 +282,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     // =========================================
-    // 🐄 ANTIGO – CADASTRO MANUAL DE ANIMAIS
+    // 🔶 SISTEMA ANTIGO – CADASTRAR ANIMAL
     // =========================================
 
     if (intent.intent === "register_animal") {
@@ -292,7 +294,7 @@ app.post("/webhook", async (req, res) => {
 
         if (!nome || !peso)
             return await sendMessage(phone,
-                "🐄 Cadastro incompleto!\nExemplo:\n" +
+                "🐄 Cadastro incompleto.\nExemplo:\n" +
                 "cadastrar nome: nelore, peso: 380, idade: 3, raca: gir"
             );
 
@@ -302,7 +304,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     // =========================================
-    // 🐄 ANTIGO – LISTAR ANIMAIS
+    // 🔷 SISTEMA ANTIGO – LISTAR ANIMAIS
     // =========================================
 
     if (intent.intent === "list_animals") {
@@ -326,17 +328,19 @@ ID: *${a.id}*
     }
 
     // =========================================
-    // 🧠 GPT - FALLBACK (ULTIMO RECURSO)
+    // 🤖 GPT FALLBACK
     // =========================================
 
-    if (!GPT_ATIVO) {
+    if (!GPT_ATIVO)
         return await sendMessage(phone, "⚠️ GPT desativado.");
-    }
 
     const history = getConversationHistory(phone, 10);
 
     const conversationMessages = [
-        { role: "system", content: systemPrompt },
+        {
+            role: "system",
+            content: systemPrompt.replace("{{userName}}", user.name || "Cliente")
+        },
         ...history.map(h => ({ role: h.role, content: h.message })),
         { role: "user", content: message }
     ];
@@ -351,13 +355,13 @@ ID: *${a.id}*
         });
 
         resposta = completion.choices[0].message.content;
-
-    } catch {
+    } catch (err) {
+        console.log(err);
         return await sendMessage(phone, "❌ Erro no GPT.");
     }
 
     // =========================================
-    // 🔍 PROCURAR JSON NA RESPOSTA DO GPT
+    // 🔍 PROCURAR JSON DO GPT
     // =========================================
 
     let jsonAcao = null;
@@ -378,7 +382,7 @@ ID: *${a.id}*
 
     if (jsonAcao) {
 
-        // 1️⃣ Registrar animal em lote
+        // 1️⃣ REGISTRAR ANIMAL EM LOTE
         if (jsonAcao.acao === "registrar_animal_lote") {
 
             addAnimalToLote(
@@ -396,7 +400,7 @@ ID: *${a.id}*
             return await sendMessage(phone, `🐮 Animal registrado no lote ${jsonAcao.lote}!`);
         }
 
-        // 2️⃣ Listar todos os lotes
+        // 2️⃣ LISTAR TODOS OS LOTES
         if (jsonAcao.acao === "listar_lotes") {
 
             const lotes = getAllLotes(phone);
@@ -413,7 +417,7 @@ ID: *${a.id}*
             return await sendMessage(phone, texto);
         }
 
-        // 3️⃣ Listar um lote específico
+        // 3️⃣ LISTAR ANIMAIS DE UM LOTE
         if (jsonAcao.acao === "listar_lote") {
 
             const animais = getLote(phone, jsonAcao.lote);
@@ -432,7 +436,7 @@ ID: *${a.id}*
     }
 
     // =========================================
-    // 🗣️ Se não teve JSON → responde normal
+    // 🗣️ SE NÃO TEVE JSON → RESPONDER NORMAL
     // =========================================
 
     addConversation(phone, "assistant", resposta);
