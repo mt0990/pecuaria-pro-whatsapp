@@ -113,8 +113,33 @@ async function sendMessage(phone, message) {
 // =========================================
 
 const systemPrompt = `
-Você é o Pecuária Pro — Assistente do Produtor Rural.
-Responda com cálculos precisos, explicações claras e sem Markdown.
+Você é o PECUÁRIA PRO, especialista em bovinos. 
+Seu objetivo é responder de forma curta, clara e prática (máx. 6 linhas). Estilo WhatsApp.
+
+REGRAS IMPORTANTES:
+- Não repetir informações.
+- Nada de textos longos ou explicações científicas.
+- Não use “ler mais”.
+- Não dizer que não pode armazenar dados.
+- Evite bullets em excesso.
+- Sempre que o usuário solicitar cadastro, registro, adicionar animal, ficha ou similar:
+  Responda brevemente e devolva um JSON assim:
+
+  {
+    "acao": "registrar_animal",
+    "tipo": "...",
+    "raca": "...",
+    "quantidade": "...",
+    "idade": "...",
+    "sexo": "...",
+    "observacao": "..."
+  }
+
+- Para pedidos de listagem de animais:
+  { "acao": "listar_animais" }
+
+- Nunca invente dados. Se faltar alguma informação essencial, peça APENAS o necessário.
+- Mantenha tom de consultor rural prático.
 `;
 
 // =========================================
@@ -360,6 +385,66 @@ ID: *${a.id}*
     } catch {
         return await sendMessage(phone, "❌ Erro GPT.");
     }
+    // =========================================
+// 🔍 VERIFICAR SE O GPT MANDOU JSON
+// =========================================
+
+let jsonAcao = null;
+
+try {
+    const jsonMatch = resposta.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+        jsonAcao = JSON.parse(jsonMatch[0]);
+        console.log("🔎 JSON detectado:", jsonAcao);
+    }
+} catch (e) {
+    console.log("⚠️ Nenhum JSON válido.");
+}
+
+
+// =========================================
+// 🐄 EXECUTAR AÇÕES DO GPT
+// =========================================
+
+if (jsonAcao) {
+
+    if (jsonAcao.acao === "registrar_animal") {
+
+        createAnimal(
+            phone,
+            jsonAcao.tipo || null,
+            jsonAcao.raca || null,
+            jsonAcao.quantidade || null,
+            jsonAcao.idade || null,
+            jsonAcao.sexo || null,
+            jsonAcao.observacao || null
+        );
+
+        return await sendMessage(phone, "🐮 Animal registrado com sucesso!");
+    }
+
+
+    if (jsonAcao.acao === "listar_animais") {
+
+        const animais = getAnimalsByUser(phone);
+
+        if (animais.length === 0)
+            return await sendMessage(phone, "📭 Você não tem animais cadastrados.");
+
+        let texto = "🐮 *Seus Animais*\n\n";
+
+        animais.forEach(a => {
+            texto += `• ${a.tipo} ${a.raca ? "(" + a.raca + ")" : ""} — ${a.quantidade}\n`;
+        });
+
+        return await sendMessage(phone, texto);
+    }
+}
+
+
+// =========================================
+// Se não houver JSON → enviar texto normal
+// =========================================
 
     addConversation(phone, "assistant", resposta);
     return await sendMessage(phone, resposta);
