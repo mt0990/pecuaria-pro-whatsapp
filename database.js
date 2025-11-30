@@ -5,8 +5,8 @@
 
 import Database from "better-sqlite3";
 
-// cria banco local
-const db = new Database("./database.sqlite");
+// cria banco em diretório persistente do Render
+const db = new Database("/data/database.sqlite");
 
 // ==============================================
 // 1️⃣ CRIAÇÃO DE TABELAS
@@ -81,12 +81,10 @@ CREATE TABLE IF NOT EXISTS lotes (
 );
 `);
 
-
 // ==============================================
 // 2️⃣ FUNÇÕES — ANIMALS (CRUD)
 // ==============================================
 
-// Criar novo animal (sistema antigo – preservado)
 export function createAnimal(owner_phone, name, breed, weight, age, notes) {
     return db.prepare(`
         INSERT INTO animals (owner_phone, name, breed, weight, age, notes, created_at)
@@ -94,18 +92,15 @@ export function createAnimal(owner_phone, name, breed, weight, age, notes) {
     `).run(owner_phone, name, breed, weight, age, notes);
 }
 
-// Listar animais do usuário
 export function getAnimalsByUser(owner_phone) {
     return db.prepare(`SELECT * FROM animals WHERE owner_phone = ?`)
              .all(owner_phone);
 }
 
-// Buscar animal específico pelo ID
 export function getAnimalById(id) {
     return db.prepare(`SELECT * FROM animals WHERE id = ?`).get(id);
 }
 
-// Atualizar animal (sistema antigo)
 export function updateAnimal(id, name, breed, weight, age, notes) {
     return db.prepare(`
         UPDATE animals
@@ -114,11 +109,9 @@ export function updateAnimal(id, name, breed, weight, age, notes) {
     `).run(name, breed, weight, age, notes, id);
 }
 
-// Deletar animal
 export function deleteAnimal(id) {
     return db.prepare(`DELETE FROM animals WHERE id = ?`).run(id);
 }
-
 
 // ==============================================
 // 3️⃣ FUNÇÕES USERS
@@ -145,7 +138,6 @@ export function updateUser(phone, fields) {
     `).run(...values, phone);
 }
 
-
 // ==============================================
 // 4️⃣ CONVERSAS / CONTEXTO
 // ==============================================
@@ -170,7 +162,6 @@ export function clearConversation(phone) {
     db.prepare("DELETE FROM conversations WHERE phone=?").run(phone);
 }
 
-
 // ==============================================
 // 5️⃣ DIAGNÓSTICOS
 // ==============================================
@@ -188,12 +179,10 @@ export function getDiagnostics(phone) {
     `).all(phone);
 }
 
-
 // ==============================================
 // 6️⃣ NOVO SISTEMA – LOTES
 // ==============================================
 
-// Registrar UM animal em um lote
 export function addAnimalToLote(
     user,
     lote,
@@ -212,7 +201,6 @@ export function addAnimalToLote(
     `).run(user, lote, tipo, raca, peso, idade, sexo, quantidade, observacao);
 }
 
-// Listar todos os lotes registrados pelo usuário
 export function getAllLotes(user) {
     return db.prepare(`
         SELECT numero_lote, COUNT(*) AS total_animais
@@ -223,7 +211,6 @@ export function getAllLotes(user) {
     `).all(user);
 }
 
-// Listar animais de um lote específico
 export function getLote(user, lote) {
     return db.prepare(`
         SELECT *
@@ -232,7 +219,6 @@ export function getLote(user, lote) {
         ORDER BY id ASC
     `).all(user, lote);
 }
-
 
 // ==============================================
 // 7️⃣ EXPORT DB
