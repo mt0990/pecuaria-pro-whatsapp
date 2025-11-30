@@ -301,24 +301,32 @@ if (encontrados && encontrados.length > 0) {
         // ---------- Adicionar animal ao lote
 if (json.acao === "adicionar_lote") {
 
-    // Garantir que os valores existam
-    const numeroLote = json.numero_lote || json.lote || null;
-    const tipo = json.tipo || "";
-    const raca = json.raca || "";
-    const peso = json.peso || "";
-    const idade = json.idade || "";
-    const sexo = json.sexo || "";
-    const quantidade = json.quantidade || 1;
+    // 📌 Normalização dos campos
+    const numeroLote = Number(json.numero_lote || json.lote || null);
+    const tipo = json.tipo?.trim() || "";
+    const raca = json.raca?.trim() || "";
+    const peso = Number(json.peso || 0);
+    const idade = Number(json.idade || 0);
+    const quantidade = Number(json.quantidade || 1);
     const observacao = json.observacao || "";
 
-    if (!numeroLote) {
-        return sendMessage(phone, "❌ Você precisa informar o número do lote. Ex.: adicionar ao lote 1");
-    }
-    
-if (!json.numero_lote) {
-    return sendMessage(phone, "Informe o número do lote. Ex.: adicionar ao lote 1");
-}
+    // 📌 Padronização do sexo
+    let sexo = (json.sexo || "").toLowerCase().trim();
+    if (["m","macho","♂","male"].includes(sexo)) sexo = "macho";
+    else if (["f","fêmea","femea","♀","female"].includes(sexo)) sexo = "fêmea";
+    else sexo = "não informado";
 
+    // 📌 Validações
+    if (!numeroLote)
+        return sendMessage(phone, "❌ Você precisa informar o número do lote. Ex.: adicionar ao lote 1");
+
+    if (!tipo)
+        return sendMessage(phone, "❌ Informe o tipo do animal. Ex.: bovino, novilha, bezerro");
+
+    if (!peso)
+        return sendMessage(phone, "❌ Informe o peso. Ex.: 340kg");
+
+    // 📌 Inserir no lote
     addAnimalToLote(
         phone,
         numeroLote,
@@ -333,6 +341,7 @@ if (!json.numero_lote) {
 
     return sendMessage(phone, `📦🐮 Animal adicionado ao lote ${numeroLote} com sucesso!`);
 }
+
         // ---------- Listar todos os lotes
         if (json.acao === "listar_lotes") {
 
