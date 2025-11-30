@@ -239,10 +239,11 @@ app.post("/webhook", async (req, res) => {
     const history = getConversationHistory(phone, 10);
 
     const conversationMessages = [
-        { role: "system", content: systemPrompt },
-        ...history.map(h => ({ role: h.role, content: h.message })),
-        { role: "user", content: message }
-    ];
+    { role: "system", content: systemPrompt },
+    { role: "system", content: `O nome do usuário é: ${user?.name || "Cliente"}` },
+    ...history.map(h => ({ role: h.role, content: h.message })),
+    { role: "user", content: message }
+];
 
     let resposta = "";
 
@@ -262,11 +263,21 @@ app.post("/webhook", async (req, res) => {
 
     let json = null;
 
-    try {
-        const match = resposta.match(/\{[\s\S]*\}/);
-        if (match) json = JSON.parse(match[0]);
-    } catch {}
+// Procura qualquer bloco de JSON válido
+const jsonRegex = /\{[^]*?\}/g;
+const encontrados = resposta.match(jsonRegex);
 
+if (encontrados && encontrados.length > 0) {
+    for (const bloco of encontrados) {
+        try {
+            const parsed = JSON.parse(bloco);
+            if (parsed.acao) {
+                json = parsed;
+                break;
+            }
+        } catch {}
+    }
+}
     // =========================================
     // EXECUTAR AÇÕES DO JSON
     // =========================================
@@ -287,24 +298,41 @@ app.post("/webhook", async (req, res) => {
             return sendMessage(phone, "🐮 Animal cadastrado com sucesso!");
         }
 
-        // ---------- Adicionar animal a lote
-        if (json.acao === "adicionar_lote") {
+        // ---------- Adicionar animal ao lote
+if (json.acao === "adicionar_lote") {
 
-            addAnimalToLote(
-                phone,
-                json.numero_lote,
-                json.tipo,
-                json.raca,
-                json.peso,
-                json.idade,
-                json.sexo,
-                json.quantidade,
-                json.observacao
-            );
+    // Garantir que os valores existam
+    const numeroLote = json.numero_lote || json.lote || null;
+    const tipo = json.tipo || "";
+    const raca = json.raca || "";
+    const peso = json.peso || "";
+    const idade = json.idade || "";
+    const sexo = json.sexo || "";
+    const quantidade = json.quantidade || 1;
+    const observacao = json.observacao || "";
 
-            return sendMessage(phone, `📦 Animal adicionado ao lote ${json.numero_lote}!`);
-        }
+    if (!numeroLote) {
+        return sendMessage(phone, "❌ Você precisa informar o número do lote. Ex.: adicionar ao lote 1");
+    }
+    
+if (!json.numero_lote) {
+    return sendMessage(phone, "Informe o número do lote. Ex.: adicionar ao lote 1");
+}
 
+    addAnimalToLote(
+        phone,
+        numeroLote,
+        tipo,
+        raca,
+        peso,
+        idade,
+        sexo,
+        quantidade,
+        observacao
+    );
+
+    return sendMessage(phone, `📦🐮 Animal adicionado ao lote ${numeroLote} com sucesso!`);
+}
         // ---------- Listar todos os lotes
         if (json.acao === "listar_lotes") {
 
@@ -332,10 +360,11 @@ app.post("/webhook", async (req, res) => {
             let txt = `📦 *Lote ${json.numero_lote}*\n\n`;
 
             animais.forEach(a => {
-                txt += `• ${a.tipo} (${a.raca || "sem raça"})  
-Peso: ${a.peso}  
-Qtd: ${a.quantidade}  
-Sexo: ${a.sexo}\n\n`;
+                txt += `🐂 *${a.tipo}* ${a.raca ? "(" + a.raca + ")" : ""}  
+⚖️ Peso: ${a.peso} kg  
+🔢 Quantidade: ${a.quantidade}  
+👤 Sexo: ${a.sexo || "não informado"}  
+📝 Obs: ${a.observacao || "nenhuma"}\n\n`;
             });
 
             return sendMessage(phone, txt);
