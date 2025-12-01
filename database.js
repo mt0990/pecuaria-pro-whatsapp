@@ -1,195 +1,140 @@
 // ==============================================
-// 📦 BANCO DE DADOS – Pecuária Pro WhatsApp Bot
-// SQLite + Better-SQLite3
+// 📦 BANCO DE DADOS – Versão Supabase
+// Conversão completa de SQLite → Supabase
 // ==============================================
 
-import fs from "fs";
-import Database from "better-sqlite3";
+import supabase from "./supabase.js";
 
-// garante que a pasta /data exista (Render precisa disso)
-if (!fs.existsSync("/data")) {
-    fs.mkdirSync("/data");
+// ==============================================
+// 1️⃣ USERS
+// ==============================================
+
+// Buscar usuário
+export async function getUser(phone) {
+    const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("phone", phone)
+        .single();
+
+    return data || null;
 }
 
-// cria banco em diretório persistente do Render
-const db = new Database("/data/database.sqlite");
-
-// ==============================================
-// 1️⃣ CRIAÇÃO DE TABELAS
-// ==============================================
-
-// Tabela: USERS (memória por usuário)
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone TEXT UNIQUE,
-    name TEXT,
-    last_message TEXT,
-    last_interaction TEXT,
-    data TEXT
-);
-`);
-
-// Tabela: CONVERSATIONS (histórico do chat)
-db.exec(`
-CREATE TABLE IF NOT EXISTS conversations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone TEXT,
-    role TEXT,
-    message TEXT,
-    timestamp TEXT,
-    FOREIGN KEY(phone) REFERENCES users(phone)
-);
-`);
-
-// Tabela: DIAGNOSTICS (dados estruturados)
-db.exec(`
-CREATE TABLE IF NOT EXISTS diagnostics (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone TEXT,
-    category TEXT,
-    data TEXT,
-    created_at TEXT,
-    FOREIGN KEY(phone) REFERENCES users(phone)
-);
-`);
-
-// Tabela: ANIMALS (sistema antigo)
-db.exec(`
-CREATE TABLE IF NOT EXISTS animals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    owner_phone TEXT,
-    name TEXT,
-    breed TEXT,
-    weight REAL,
-    age INTEGER,
-    notes TEXT,
-    created_at TEXT
-);
-`);
-
-// ==============================================
-// 🆕 TABELA NOVA: LOTES
-// ==============================================
-db.exec(`
-CREATE TABLE IF NOT EXISTS lotes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_number TEXT,
-    numero_lote INTEGER,
-    tipo TEXT,
-    raca TEXT,
-    peso TEXT,
-    idade TEXT,
-    sexo TEXT,
-    quantidade INTEGER,
-    observacao TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
-);
-`);
-
-// ==============================================
-// 2️⃣ FUNÇÕES — ANIMALS (CRUD)
-// ==============================================
-
-export function createAnimal(owner_phone, name, breed, weight, age, notes) {
-    return db.prepare(`
-        INSERT INTO animals (owner_phone, name, breed, weight, age, notes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(owner_phone, name, breed, weight, age, notes);
+// Criar usuário
+export async function createUser(phone, name = null) {
+    await supabase.from("users").insert([
+        {
+            phone,
+            name,
+            last_interaction: new Date().toISOString(),
+            data: "{}"
+        }
+    ]);
 }
 
-export function getAnimalsByUser(owner_phone) {
-    return db.prepare(`SELECT * FROM animals WHERE owner_phone = ?`)
-             .all(owner_phone);
-}
-
-export function getAnimalById(id) {
-    return db.prepare(`SELECT * FROM animals WHERE id = ?`).get(id);
-}
-
-export function updateAnimal(id, name, breed, weight, age, notes) {
-    return db.prepare(`
-        UPDATE animals
-        SET name = ?, breed = ?, weight = ?, age = ?, notes = ?
-        WHERE id = ?
-    `).run(name, breed, weight, age, notes, id);
-}
-
-export function deleteAnimal(id) {
-    return db.prepare(`DELETE FROM animals WHERE id = ?`).run(id);
+// Atualizar usuário
+export async function updateUser(phone, fields) {
+    await supabase
+        .from("users")
+        .update(fields)
+        .eq("phone", phone);
 }
 
 // ==============================================
-// 3️⃣ FUNÇÕES USERS
+// 2️⃣ CONVERSAS
 // ==============================================
 
-export function getUser(phone) {
-    return db.prepare("SELECT * FROM users WHERE phone=?").get(phone);
+export async function addConversation(phone, role, message) {
+    await supabase.from("conversations").insert([
+        {
+            phone,
+            role,
+            message,
+            timestamp: new Date().toISOString()
+        }
+    ]);
 }
 
-export function createUser(phone, name = null) {
-    db.prepare(`
-        INSERT INTO users (phone, name, last_interaction, data)
-        VALUES (?, ?, DATETIME('now'), '{}')
-    `).run(phone, name);
-}
+export async function getConversationHistory(phone, limit = 10) {
+    const { data } = await supabase
+        .from("conversations")
+        .select("role, message")
+        .eq("phone", phone)
+        .order("id", { ascending: false })
+        .limit(limit);
 
-export function updateUser(phone, fields) {
-    const keys = Object.keys(fields);
-    const values = Object.values(fields);
-    const setClause = keys.map(k => `${k}=?`).join(", ");
-
-    db.prepare(`
-        UPDATE users SET ${setClause} WHERE phone=?
-    `).run(...values, phone);
-}
-
-// ==============================================
-// 4️⃣ CONVERSAS / CONTEXTO
-// ==============================================
-
-export function addConversation(phone, role, message) {
-    db.prepare(`
-        INSERT INTO conversations (phone, role, message, timestamp)
-        VALUES (?, ?, ?, DATETIME('now'))
-    `).run(phone, role, message);
-}
-
-export function getConversationHistory(phone, limit = 10) {
-    return db.prepare(`
-        SELECT role, message FROM conversations
-        WHERE phone=?
-        ORDER BY id DESC
-        LIMIT ?
-    `).all(phone, limit).reverse();
-}
-
-export function clearConversation(phone) {
-    db.prepare("DELETE FROM conversations WHERE phone=?").run(phone);
+    return data ? data.reverse() : [];
 }
 
 // ==============================================
-// 5️⃣ DIAGNÓSTICOS
+// 3️⃣ DIAGNÓSTICOS
 // ==============================================
 
-export function saveDiagnostic(phone, category, data) {
-    db.prepare(`
-        INSERT INTO diagnostics (phone, category, data, created_at)
-        VALUES (?, ?, ?, DATETIME('now'))
-    `).run(phone, category, JSON.stringify(data));
+export async function saveDiagnostic(phone, category, payload) {
+    await supabase.from("diagnostics").insert([
+        {
+            phone,
+            category,
+            data: JSON.stringify(payload),
+            created_at: new Date().toISOString()
+        }
+    ]);
 }
 
-export function getDiagnostics(phone) {
-    return db.prepare(`
-        SELECT * FROM diagnostics WHERE phone=? ORDER BY id DESC
-    `).all(phone);
+export async function getDiagnostics(phone) {
+    const { data } = await supabase
+        .from("diagnostics")
+        .select("*")
+        .eq("phone", phone)
+        .order("id", { ascending: false });
+
+    return data || [];
 }
 
 // ==============================================
-// 6️⃣ NOVO SISTEMA – LOTES
+// 4️⃣ ANIMAIS (sistema antigo)
 // ==============================================
 
-export function addAnimalToLote(
+export async function createAnimal(owner_phone, name, breed, weight, age, notes) {
+    await supabase.from("animals").insert([
+        {
+            owner_phone,
+            name,
+            breed,
+            weight,
+            age,
+            notes,
+            created_at: new Date().toISOString()
+        }
+    ]);
+}
+
+export async function getAnimalsByUser(owner_phone) {
+    const { data } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("owner_phone", owner_phone);
+
+    return data || [];
+}
+
+export async function updateAnimal(id, name, breed, weight, age, notes) {
+    await supabase
+        .from("animals")
+        .update({ name, breed, weight, age, notes })
+        .eq("id", id);
+}
+
+export async function deleteAnimal(id) {
+    await supabase.from("animals").delete().eq("id", id);
+}
+
+// ==============================================
+// 5️⃣ LOTES (SISTEMA NOVO)
+// ==============================================
+
+// Inserir animal no lote
+export async function addAnimalToLote(
     user,
     lote,
     tipo,
@@ -200,34 +145,54 @@ export function addAnimalToLote(
     quantidade,
     observacao
 ) {
-    return db.prepare(`
-        INSERT INTO lotes (
-            user_number, numero_lote, tipo, raca, peso, idade, sexo, quantidade, observacao
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(user, lote, tipo, raca, peso, idade, sexo, quantidade, observacao);
+    await supabase.from("lotes").insert([
+        {
+            user_number: user,
+            numero_lote: lote,
+            tipo,
+            raca,
+            peso,
+            idade,
+            sexo,
+            quantidade,
+            observacao,
+            created_at: new Date().toISOString()
+        }
+    ]);
 }
 
-export function getAllLotes(user) {
-    return db.prepare(`
-        SELECT numero_lote, COUNT(*) AS total_animais
-        FROM lotes
-        WHERE user_number = ?
-        GROUP BY numero_lote
-        ORDER BY numero_lote ASC
-    `).all(user);
+// Listar todos os lotes do usuário
+export async function getAllLotes(user) {
+    const { data } = await supabase
+        .from("lotes")
+        .select("numero_lote, quantidade")
+        .eq("user_number", user);
+
+    if (!data) return [];
+
+    // Agrupa por lote
+    const grupos = {};
+
+    data.forEach(item => {
+        if (!grupos[item.numero_lote]) grupos[item.numero_lote] = 0;
+        grupos[item.numero_lote] += item.quantidade;
+    });
+
+    return Object.entries(grupos).map(([lote, total]) => ({
+        numero_lote: lote,
+        total_animais: total
+    }));
 }
 
-export function getLote(user, lote) {
-    return db.prepare(`
-        SELECT *
-        FROM lotes
-        WHERE user_number = ? AND numero_lote = ?
-        ORDER BY id ASC
-    `).all(user, lote);
+// Listar animais de um lote
+export async function getLote(user, lote) {
+    const { data } = await supabase
+        .from("lotes")
+        .select("*")
+        .eq("user_number", user)
+        .eq("numero_lote", lote)
+        .order("id", { ascending: true });
+
+    return data || [];
 }
-
-// ==============================================
-// 7️⃣ EXPORT DB
-// ==============================================
-
-export default db;
+    
