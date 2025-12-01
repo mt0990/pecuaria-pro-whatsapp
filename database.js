@@ -3,7 +3,13 @@
 // SQLite + Better-SQLite3
 // ==============================================
 
+import fs from "fs";
 import Database from "better-sqlite3";
+
+// garante que a pasta /data exista (Render precisa disso)
+if (!fs.existsSync("/data")) {
+    fs.mkdirSync("/data");
+}
 
 // cria banco em diretório persistente do Render
 const db = new Database("/data/database.sqlite");
