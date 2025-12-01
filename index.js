@@ -10,7 +10,27 @@ import dotenv from "dotenv";
 // NLP
 import { detectIntent } from "./services/nlp.js";
 
-// Cálculos (não interferem com lotes)
+// ==============================
+// 📦 DATABASE (SUPABASE)
+// ==============================
+import {
+    salvarAnimalDB,
+    getAnimalsByUser,
+    updateAnimalDB,
+    deleteAnimalDB,
+    getLote,
+    getAllLotes,
+    addAnimalToLote,
+    getUser,
+    createUser,
+    updateUser,
+    addConversation,
+    getConversationHistory
+} from "./database.js";
+
+// ==============================
+// 🔢 Cálculos pecuários
+// ==============================
 import {
     calcularDieta,
     custoPorArroba,
@@ -18,7 +38,9 @@ import {
     calcularLotacao
 } from "./services/cattle.js";
 
-// Extração
+// ==============================
+// 🔎 Extração de dados
+// ==============================
 import {
     extrairPesoDaMensagem,
     extrairQuantidadeDaMensagem,
@@ -26,7 +48,9 @@ import {
     extrairAreaHa
 } from "./services/extract.js";
 
-// Formatação
+// ==============================
+// 🧾 Formatação
+// ==============================
 import {
     formatDieta,
     formatCustoArroba,
@@ -35,22 +59,6 @@ import {
     formatError,
     formatMissingData
 } from "./services/formatter.js";
-
-// Banco (Agora Supabase)
-import {
-    getUser,
-    createUser,
-    updateUser,
-    addConversation,
-    getConversationHistory,
-    createAnimal,
-    getAnimalsByUser,
-    updateAnimal,
-    deleteAnimal,
-    getLote,
-    getAllLotes,
-    addAnimalToLote
-} from "./database.js";
 
 dotenv.config();
 
@@ -90,11 +98,49 @@ async function sendMessage(phone, message) {
 }
 
 // =========================================
-// 🧠 SYSTEM PROMPT — Ajustado para LOTES
+// 🧠 SYSTEM PROMPT
 // =========================================
 
 const systemPrompt = `
-( MANTIVE SEU SYSTEM PROMPT INALTERADO )
+Você é o assistente oficial da Pecuária Pro.
+Ajuda o produtor com:
+- dietas
+- cálculos
+- lotes
+- registro de animais
+- diagnósticos
+
+Quando precisar executar ações, responda COM JSON no formato:
+{
+  "acao": "...",
+  "campo1": "...",
+  "campo2": "..."
+}
+
+Ações possíveis:
+
+1️⃣ registrar_animal  
+   { "acao":"registrar_animal", "nome":"", "raca":"", "peso":0, "idade":0, "observacao":"" }
+
+2️⃣ listar_animais  
+   { "acao":"listar_animais" }
+
+3️⃣ atualizar_animal  
+   { "acao":"atualizar_animal", "id":0, "peso":0, "raca":"", "idade":0, "observacao":"" }
+
+4️⃣ deletar_animal  
+   { "acao":"deletar_animal", "id":0 }
+
+5️⃣ adicionar_lote  
+   { "acao":"adicionar_lote", "numero_lote":1, "tipo":"", "raca":"", "peso":0, "idade":0, "sexo":"macho|fêmea", "quantidade":1 }
+
+6️⃣ listar_lotes  
+   { "acao":"listar_lotes" }
+
+7️⃣ listar_lote  
+   { "acao":"listar_lote", "numero_lote":1 }
+
+NUNCA invente campos.
 `;
 
 // =========================================
@@ -125,7 +171,7 @@ app.post("/webhook", async (req, res) => {
     processedMessages.add(data.id);
 
     // =========================================
-    // USUÁRIO (VERSÃO ASSÍNCRONA CORRIGIDA)
+    // 👤 USUÁRIO
     // =========================================
 
     let user = await getUser(phone);
@@ -174,14 +220,14 @@ app.post("/webhook", async (req, res) => {
     }
 
     // =========================================
-    // GPT FALLBACK
+    // 🔮 GPT FALLBACK
     // =========================================
 
     const history = await getConversationHistory(phone, 10);
 
     const conversationMessages = [
         { role: "system", content: systemPrompt },
-        { role: "system", content: `O nome do usuário é: ${user?.name || "Cliente"}` },
+        { role: "system", content: `Nome do usuário: ${user?.name || "Cliente"}` },
         ...history.map(h => ({ role: h.role, content: h.message })),
         { role: "user", content: message }
     ];
@@ -216,27 +262,74 @@ app.post("/webhook", async (req, res) => {
     }
 
     // =========================================
-    // AÇÕES DO JSON (ASSÍNCRONAS!)
+    // 🟦 AÇÕES DO JSON (CRUD + LOTES)
     // =========================================
 
     if (json) {
 
-        // Registrar animal simples
+        // 1️⃣ Registrar Animal
         if (json.acao === "registrar_animal") {
 
-            await createAnimal(
-                phone,
-                json.tipo,
-                json.raca,
-                json.peso,
-                json.idade,
-                json.observacao || ""
-            );
+            await salvarAnimalDB({
+                telefone: phone,
+                nome: json.nome || json.tipo || "Animal",
+                raca: json.raca,
+                peso: json.peso,
+                idade: json.idade,
+                notas: json.observacao || ""
+            });
 
             return sendMessage(phone, "🐮 Animal cadastrado com sucesso!");
         }
 
-        // Adicionar animal ao lote
+        // 2️⃣ Listar Animais
+        if (json.acao === "listar_animais") {
+            const animais = await getAnimalsByUser(phone);
+
+            if (!animais.length)
+                return sendMessage(phone, "📭 Você ainda não tem animais cadastrados.");
+
+            let txt = "🐮 *Seus animais cadastrados*\n\n";
+
+            animais.forEach(a => {
+                txt += `• ${a.nome} (${a.raca || "sem raça"})  
+⚖️ Peso: ${a.peso} kg  
+📅 Idade: ${a.idade || "não informada"}  
+📝 Obs: ${a.notas || "nenhuma"}  
+🆔 ID: ${a.id}\n\n`;
+            });
+
+            return sendMessage(phone, txt);
+        }
+
+        // 3️⃣ Atualizar Animal
+        if (json.acao === "atualizar_animal") {
+
+            if (!json.id)
+                return sendMessage(phone, "❌ Informe o ID do animal.");
+
+            await updateAnimalDB(json.id, {
+                peso: json.peso,
+                idade: json.idade,
+                raca: json.raca,
+                notas: json.observacao
+            });
+
+            return sendMessage(phone, "✔️ Animal atualizado com sucesso!");
+        }
+
+        // 4️⃣ Deletar Animal
+        if (json.acao === "deletar_animal") {
+
+            if (!json.id)
+                return sendMessage(phone, "❌ Informe o ID do animal para excluir.");
+
+            await deleteAnimalDB(json.id);
+
+            return sendMessage(phone, "🗑️ Animal removido com sucesso!");
+        }
+
+        // 5️⃣ Adicionar Animal ao Lote
         if (json.acao === "adicionar_lote") {
 
             const numeroLote = Number(json.numero_lote);
@@ -269,7 +362,7 @@ app.post("/webhook", async (req, res) => {
             return sendMessage(phone, `📦🐮 Animal adicionado ao lote ${numeroLote}!`);
         }
 
-        // Listar lotes
+        // 6️⃣ Listar Lotes
         if (json.acao === "listar_lotes") {
 
             const lotes = await getAllLotes(phone);
@@ -286,7 +379,7 @@ app.post("/webhook", async (req, res) => {
             return sendMessage(phone, txt);
         }
 
-        // Listar animais do lote
+        // 7️⃣ Listar Animais de um Lote
         if (json.acao === "listar_lote") {
 
             const animais = await getLote(phone, json.numero_lote);

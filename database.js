@@ -91,42 +91,71 @@ export async function getDiagnostics(phone) {
     return data || [];
 }
 
-// ==============================================
-// 4️⃣ ANIMAIS (sistema antigo)
-// ==============================================
+// SALVAR animal no Supabase
+export async function salvarAnimalDB({ telefone, nome, raca, peso, idade, notas }) {
+    const { error } = await supabase
+        .from("animals")
+        .insert([
+            {
+                owner_phone: telefone,
+                name: nome,
+                breed: raca,
+                weight: peso,
+                age: idade,
+                notes: notas,
+                created_at: new Date().toISOString()
+            }
+        ]);
 
-export async function createAnimal(owner_phone, name, breed, weight, age, notes) {
-    await supabase.from("animals").insert([
-        {
-            owner_phone,
-            name,
-            breed,
-            weight,
-            age,
-            notes,
-            created_at: new Date().toISOString()
-        }
-    ]);
+    if (error) {
+        console.log("❌ Erro ao salvar animal:", error);
+        return false;
+    }
+
+    return true;
 }
 
 export async function getAnimalsByUser(owner_phone) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("animals")
         .select("*")
-        .eq("owner_phone", owner_phone);
+        .eq("owner_phone", owner_phone)
+        .order("id", { ascending: true });
+
+    if (error) {
+        console.log("❌ Erro ao buscar animais:", error);
+        return [];
+    }
 
     return data || [];
 }
 
-export async function updateAnimal(id, name, breed, weight, age, notes) {
-    await supabase
+export async function updateAnimalDB(id, updates) {
+    const { error } = await supabase
         .from("animals")
-        .update({ name, breed, weight, age, notes })
+        .update(updates)
         .eq("id", id);
+
+    if (error) {
+        console.log("❌ Erro ao atualizar animal:", error);
+        return false;
+    }
+
+    return true;
 }
 
-export async function deleteAnimal(id) {
-    await supabase.from("animals").delete().eq("id", id);
+export async function deleteAnimalDB(id) {
+    const { error } = await supabase
+        .from("animals")
+        .delete()
+        .eq("id", id);
+
+    if (error) {
+        console.log("❌ Erro ao deletar animal:", error);
+        return false;
+    }
+
+    return true;
 }
 
 // ==============================================
@@ -195,4 +224,3 @@ export async function getLote(user, lote) {
 
     return data || [];
 }
-    
