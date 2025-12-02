@@ -3,7 +3,7 @@
 // Detector de intenções inteligente, limpo e profissional
 // =============================================================
 
-export function detectIntent(message) {
+export function detectarIntencao(message) {
     if (!message) return { intent: "gpt" };
 
     const t = message.toLowerCase().trim();
