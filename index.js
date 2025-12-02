@@ -1,6 +1,6 @@
 // =========================================
 // 📌 PECUÁRIA PRO - WhatsApp Bot (PT-BR)
-// Versão Final Estável 100% compatível com Supabase
+// Versão Estável Corrigida 100% compatível com Supabase
 // =========================================
 
 import express from "express";
@@ -59,10 +59,6 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// =========================================
-// CONFIGURAÇÕES
-// =========================================
-
 const processedMessages = new Set();
 
 const ULTRA_INSTANCE_ID = process.env.ULTRAMSG_INSTANCE_ID;
@@ -94,77 +90,21 @@ async function sendMessage(phone, message, userName = null) {
 }
 
 // =========================================
-// SYSTEM PROMPT
+// SYSTEM PROMPT (corrigido: remove suporte JSON para listar lote)
 // =========================================
 
 const systemPrompt = `
-Você é o assistente da PECUÁRIA PRO em português.
+Você é o assistente da PECUÁRIA PRO.
 
 ⚠️ SOMENTE envie JSON quando:
-- O usuário pedir explicitamente para cadastrar, atualizar, deletar, listar animais ou lotes.
-- Quando a intenção for claramente uma AÇÃO.
-
-⚠️ SE a pergunta for informativa, explicativa, dúvida, conversa, curiosidade, assunto técnico, doença, vacina, manejo, pasto, reprodução:
-➡️ NUNCA envie JSON.
-➡️ Responda normalmente em TEXTO.
-
-📌 AÇÕES PERMITIDAS (JSON):
-
-1) registrar_animal:
-{
-  "acao": "registrar_animal",
-  "numero_boi": 0,
-  "nome": "",
-  "raca": "",
-  "peso": 0,
-  "idade": 0,
-  "notas": ""
-}
-
-2) listar_animais:
-{ "acao": "listar_animais" }
-
-3) atualizar_animal:
-{
-  "acao": "atualizar_animal",
-  "numero_boi": 0,
-  "peso": 0,
-  "idade": 0,
-  "raca": "",
-  "notas": ""
-}
-
-4) deletar_animal:
-{
-  "acao": "deletar_animal",
-  "numero_boi": 0
-}
-
-5) adicionar_lote:
-{
-  "acao": "adicionar_lote",
-  "numero_lote": 0,
-  "tipo": "",
-  "raca": "",
-  "peso": 0,
-  "idade": 0,
-  "sexo": "",
-  "quantidade": 1,
-  "observacao": ""
-}
-
-6) listar_lotes:
-{ "acao": "listar_lotes" }
-
-7) listar_lote:
-{
-  "acao": "listar_lote",
-  "numero_lote": 0
-}
-
-⚠️ IMPORTANTE ⚠️  
-Nunca envie JSON se a intenção NÃO for uma ação.
-Para qualquer dúvida, explicação, pergunta ou conversa → responda somente em texto.         
+- Cadastrar animal
+- Atualizar animal
+- Deletar animal
+- Listar ANIMAIS
+- Adicionar animal ao lote
+- Listar LOTES (não lote individual)
+❌ NUNCA envie JSON para "listar lote 1", "ver lote", "mostrar lote".
+➡️ Isso é SEMPRE ação local (NLP).
 `;
 
 // =========================================
@@ -207,11 +147,11 @@ app.post("/webhook", async (req, res) => {
     // Detecta intenção
     const intent = detectarIntencao(message);
 
-    // -------------------------------------
-    // AÇÕES DIRETAS (sem GPT)
-    // -------------------------------------
+    // =========================================
+    // AÇÕES DIRETAS (SEM GPT)
+    // =========================================
 
-    // Dieta
+    // DIETA
     if (intent.intent === "dieta") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
@@ -227,7 +167,7 @@ app.post("/webhook", async (req, res) => {
         return sendMessage(phone, formatUA(calcularUA(peso) * qtd));
     }
 
-    // Custo arroba
+    // Custo da arroba
     if (intent.intent === "arroba") {
         const peso = extrairPesoDaMensagem(message);
         const custo = extrairCustoDaMensagem(message);
@@ -237,75 +177,59 @@ app.post("/webhook", async (req, res) => {
 
     // Listar animais
     if (intent.intent === "listar_animais") {
-    const animais = await getAnimalsByUser(phone);
+        const animais = await getAnimalsByUser(phone);
 
-    if (!animais.length)
-        return sendMessage(phone, "📭 Você não tem animais cadastrados.");
+        if (!animais.length)
+            return sendMessage(phone, "📭 Você não tem animais cadastrados.");
 
-    let txt = "🐮 *Seus animais cadastrados*\n\n";
+        let txt = "🐮 *Seus animais cadastrados*\n\n";
 
-    animais.forEach(a => {
-        txt += `• Boi #${a.numero_boi}
+        animais.forEach(a => {
+            txt += `• Boi #${a.numero_boi}
 📌 Nome: ${a.nome}
 🐄 Raça: ${a.raca || "não informada"}
 ⚖️ Peso: ${a.peso} kg
 📅 Idade: ${a.idade} ano(s)
 📝 Obs: ${a.notas || "nenhuma"}\n\n`;
-    });
+        });
 
-    return sendMessage(phone, txt);
-}
+        return sendMessage(phone, txt);
+    }
 
-    // Listar lotes
+    // Listar LOTE (via NLP — CORRIGIDO)
     if (intent.intent === "listar_lote" && intent.numero_lote) {
-    const animais = await getLote(phone, intent.numero_lote);
+        const animais = await getLote(phone, intent.numero_lote);
 
-    if (!animais.length)
-        return sendMessage(phone, `📭 O lote ${intent.numero_lote} está vazio.`);
+        if (!animais.length)
+            return sendMessage(phone, `📭 O lote ${intent.numero_lote} está vazio.`);
 
-    let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
+        let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
 
-    animais.forEach(a => {
-        txt += `🐂 ${a.tipo}
+        animais.forEach(a => {
+            txt += `🐂 ${a.tipo}
 Raça: ${a.raca || "não informada"}
 Peso: ${a.peso} kg
 Idade: ${a.idade} ano(s)
 Sexo: ${a.sexo}
 Quantidade: ${a.quantidade}
 Obs: ${a.observacao || "nenhuma"}\n\n`;
-    });
-
-    return sendMessage(phone, txt);
-}
-
-    // Listar lote com número
-    if (intent.intent === "listar_lote" && intent.numero_lote) {
-        const lotes = await getLote(phone, intent.numero_lote);
-
-        if (!lotes.length)
-            return sendMessage(phone, `O lote ${intent.numero_lote} está vazio.`);
-
-        let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
-
-        lotes.forEach(a => {
-            txt += `🐂 ${a.tipo} - ${a.peso}kg\nQtd: ${a.quantidade}\nSexo: ${a.sexo}\n\n`;
         });
 
         return sendMessage(phone, txt);
     }
 
-    // --------------------------------------------------------
-    // GPT — SOMENTE PARA AÇÕES COMPLEXAS
-    // --------------------------------------------------------
+    // =========================================
+    // GPT (somente quando o NLP NÃO resolve)
+    // =========================================
 
     const history = await getConversationHistory(phone, 6);
 
     const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "system", content: `Nome do usuário: ${user?.name || "produtor"}` },
-    ...history.map(h => ({ role: h.role, content: h.message })),
-    { role: "user", content: message }
-];
+        { role: "system", content: systemPrompt },
+        { role: "system", content: `Nome do usuário: ${user?.name || "produtor"}` },
+        ...history.map(h => ({ role: h.role, content: h.message })),
+        { role: "user", content: message }
+    ];
 
     let resposta = "";
 
@@ -322,45 +246,41 @@ Obs: ${a.observacao || "nenhuma"}\n\n`;
     }
 
     // -------------------------------------------
-    // Interpretar JSON
+    // INTERPRETAR JSON (apenas ações válidas)
     // -------------------------------------------
 
     let json = null;
     const regex = /\{[\s\S]*?\}/g;
-const matches = resposta.match(regex);
+    const matches = resposta.match(regex);
 
-if (matches) {
-    for (const bloco of matches) {
-        try {
-            const parsed = JSON.parse(bloco);
+    if (matches) {
+        for (const bloco of matches) {
+            try {
+                const parsed = JSON.parse(bloco);
 
-            // Aceita JSON SOMENTE SE TIVER UMA AÇÃO VÁLIDA
-            const acoesValidas = [
-                "registrar_animal",
-                "adicionar_animal",
-                "listar_animais",
-                "mostrar_animais",
-                "atualizar_animal",
-                "deletar_animal",
-                "adicionar_lote",
-                "listar_lotes",
-                "listar_lote",
-                "mostre_lote",
-                "quero_ver_lote"
-            ];
+                const acoesValidas = [
+                    "registrar_animal",
+                    "listar_animais",
+                    "atualizar_animal",
+                    "deletar_animal",
+                    "adicionar_lote",
+                    "listar_lotes"
+                ];
 
-            if (parsed.acao && acoesValidas.includes(parsed.acao)) {
-                json = parsed;
-            }
+                if (parsed.acao && acoesValidas.includes(parsed.acao)) {
+                    json = parsed;
+                }
 
-        } catch {}
+            } catch {}
+        }
     }
-}
+
     // -------------------------------------------
-    // EXECUTAR AÇÕES DO JSON
+    // EXECUTAR AÇÕES DO JSON (listagem de lote REMOVIDA)
     // -------------------------------------------
 
     if (json) {
+
         // Registrar
         if (json.acao === "registrar_animal") {
             await salvarAnimalDB({
@@ -411,23 +331,24 @@ if (matches) {
             return sendMessage(phone, `📦 Animal adicionado ao lote ${json.numero_lote}!`);
         }
 
-        // Listar lote via JSON
-        if (json.acao === "listar_lote") {
-            const lotes = await getLote(phone, json.numero_lote);
+        // Listar lotes (todos)
+        if (json.acao === "listar_lotes") {
+            const lotes = await getAllLotes(phone);
 
             if (!lotes.length)
-                return sendMessage(phone, `O lote ${json.numero_lote} está vazio.`);
+                return sendMessage(phone, "📭 Você não possui lotes.");
 
-            let txt = `📦 *Lote ${json.numero_lote}*\n\n`;
-            lotes.forEach(a => {
-                txt += `🐂 ${a.tipo} - ${a.peso}kg\n`;
+            let txt = "📦 *Seus lotes cadastrados*\n\n";
+
+            lotes.forEach(l => {
+                txt += `• Lote ${l.numero_lote} — ${l.total_animais} animais\n`;
             });
 
             return sendMessage(phone, txt);
         }
     }
 
-    // Se não houve JSON → resposta normal
+    // Resposta normal
     return sendMessage(phone, resposta);
 });
 
@@ -435,4 +356,6 @@ if (matches) {
 // INICIAR SERVIDOR
 // =========================================
 
-app.listen(PORT, () => console.log(`🚀 Pecuária Pro rodando na porta ${PORT}`));
+app.listen(PORT, () =>
+    console.log(`🚀 Pecuária Pro rodando na porta ${PORT}`)
+);
