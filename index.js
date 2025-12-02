@@ -1,5 +1,5 @@
 // =========================================
-// 📌 PECUÁRIA PRO - WhatsApp Bot (Token Saver Edition)
+// 📌 PECUÁRIA PRO – WhatsApp Bot (Versão PT-BR Otimizada)
 // =========================================
 
 import express from "express";
@@ -10,7 +10,7 @@ import dotenv from "dotenv";
 // NLP
 import { detectIntent } from "./services/nlp.js";
 
-// DB (Supabase)
+// Banco de Dados
 import {
     salvarAnimalDB,
     getAnimalsByUser,
@@ -48,7 +48,6 @@ import {
     formatCustoArroba,
     formatUA,
     formatLotacao,
-    formatError,
     formatMissingData
 } from "./services/formatter.js";
 
@@ -56,7 +55,6 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-
 const PORT = process.env.PORT || 3000;
 
 // =========================================
@@ -90,29 +88,74 @@ async function sendMessage(phone, message) {
 }
 
 // =========================================
-// 🧠 SYSTEM PROMPT (apenas quando GPT for usado)
+// 🧠 SYSTEM PROMPT (GPT só quando necessário)
 // =========================================
 
 const systemPrompt = `
-Você é o assistente oficial da Pecuária Pro.
-Responda somente quando necessário interpretar linguagem natural complexa.
+Você é o assistente oficial da PECUÁRIA PRO.
 
-Quando precisar executar ações, retorne APENAS JSON:
+⚠️ REGRAS IMPORTANTES PARA JSON:
+- Só envie JSON quando o usuário pedir uma ação.
+- JSON deve usar APENAS campos em português.
+- Nunca deixe campos vazios.
+- Nunca invente campos.
+- Se faltar informação, peça ao usuário (sem JSON).
 
+📘 AÇÕES DISPONÍVEIS:
+
+1️⃣ registrar_animal  
 {
-  "acao": "...",
-  "campo1": "...",
-  "campo2": "..."
+  "acao": "registrar_animal",
+  "numero_boi": 0,
+  "nome": "",
+  "raca": "",
+  "peso": 0,
+  "idade": 0,
+  "notas": ""
 }
 
-Ações disponíveis:
-- registrar_animal
-- listar_animais
-- atualizar_animal
-- deletar_animal
-- adicionar_lote
-- listar_lotes
-- listar_lote
+2️⃣ listar_animais  
+{ "acao": "listar_animais" }
+
+3️⃣ atualizar_animal  
+{
+  "acao": "atualizar_animal",
+  "numero_boi": 0,
+  "peso": 0,
+  "idade": 0,
+  "raca": "",
+  "notas": ""
+}
+
+4️⃣ deletar_animal  
+{
+  "acao": "deletar_animal",
+  "numero_boi": 0
+}
+
+5️⃣ adicionar_lote  
+{
+  "acao": "adicionar_lote",
+  "numero_lote": 0,
+  "tipo": "",
+  "raca": "",
+  "peso": 0,
+  "idade": 0,
+  "sexo": "",
+  "quantidade": 1,
+  "observacao": ""
+}
+
+6️⃣ listar_lotes  
+{ "acao": "listar_lotes" }
+
+7️⃣ listar_lote  
+{
+  "acao": "listar_lote",
+  "numero_lote": 0
+}
+
+⚠️ SE NÃO FOR UMA AÇÃO → responda normalmente em português.
 `;
 
 // =========================================
@@ -137,7 +180,7 @@ app.post("/webhook", async (req, res) => {
     // Usuário
     let user = await getUser(phone);
     if (!user) {
-        await createUser(phone, data.pushname);
+        await createUser(phone, data.pushname || "Produtor");
         user = await getUser(phone);
     }
 
@@ -152,14 +195,14 @@ app.post("/webhook", async (req, res) => {
     const intent = detectIntent(message);
 
     // ============================================================
-    // 🔵 AÇÕES DIRETAS (NÃO USAM GPT → ECONOMIA DE TOKENS)
+    // 🔵 AÇÕES DIRETAS (SEM GPT)
     // ============================================================
 
     // Dieta
     if (intent.intent === "diet") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
-        if (!peso) return sendMessage(phone, "Informe peso. Ex.: boi 380kg");
+        if (!peso) return sendMessage(phone, "Informe o peso do animal.");
         return sendMessage(phone, formatDieta(calcularDieta(peso, qtd), peso, qtd));
     }
 
@@ -167,7 +210,7 @@ app.post("/webhook", async (req, res) => {
     if (intent.intent === "ua_calc") {
         const peso = extrairPesoDaMensagem(message);
         const qtd = extrairQuantidadeDaMensagem(message);
-        if (!peso) return sendMessage(phone, "Informe peso. Ex.: UA boi 420kg");
+        if (!peso) return sendMessage(phone, "Informe o peso para calcular UA.");
         return sendMessage(phone, formatUA(calcularUA(peso) * qtd));
     }
 
@@ -179,23 +222,16 @@ app.post("/webhook", async (req, res) => {
         return sendMessage(phone, formatCustoArroba(custoPorArroba(custo, peso), peso, custo));
     }
 
-    // ================================
-    // CRUD DIRETO - SEM GPT
-    // ================================
-
-    // Registrar animal
-    if (intent.intent === "registrar_animal") {
-        return sendMessage(phone, "🐮 Vamos registrar! Informe: nome, raça, peso, idade.");
-    }
-
     // Listar animais
     if (intent.intent === "listar_animais") {
         const animais = await getAnimalsByUser(phone);
-        if (!animais.length) return sendMessage(phone, "📭 Você não tem animais cadastrados.");
-        
+
+        if (!animais.length)
+            return sendMessage(phone, "📭 Você ainda não cadastrou nenhum animal.");
+
         let txt = "🐮 *Seus animais cadastrados*\n\n";
         animais.forEach(a => {
-            txt += `• ${a.nome} (${a.raca || "sem raça"}) - ${a.peso}kg (ID ${a.id})\n`;
+            txt += `• #${a.numero_boi} - ${a.nome}\nRaça: ${a.raca}\nPeso: ${a.peso} kg\nIdade: ${a.idade}\n\n`;
         });
 
         return sendMessage(phone, txt);
@@ -204,33 +240,36 @@ app.post("/webhook", async (req, res) => {
     // Listar lotes
     if (intent.intent === "listar_lotes") {
         const lotes = await getAllLotes(phone);
-        if (!lotes.length) return sendMessage(phone, "📭 Você não tem lotes cadastrados.");
+
+        if (!lotes.length)
+            return sendMessage(phone, "📭 Você não possui lotes cadastrados.");
 
         let txt = "📦 *Seus lotes*\n\n";
-        lotes.forEach(l => txt += `• Lote ${l.numero_lote}: ${l.total_animais} animais\n`);
+        lotes.forEach(l => {
+            txt += `• Lote ${l.numero_lote}: ${l.total_animais} animais\n`;
+        });
+
         return sendMessage(phone, txt);
     }
 
-    // Listar um lote específico
+    // Listar lote específico
     if (intent.intent === "listar_lote" && intent.numero_lote) {
         const animais = await getLote(phone, intent.numero_lote);
-        if (!animais.length) return sendMessage(phone, `📭 O lote ${intent.numero_lote} está vazio.`);
-        
-        let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
-        animais.forEach(a => {
-            txt += `🐂 ${a.tipo} - ${a.peso}kg (${a.raca || "sem raça"})\n`;
-        });
-        
-        return sendMessage(phone, txt);
-    }
 
-    // Adicionar ao lote sem interpretação → GPT NECESSÁRIO
-    if (intent.intent === "add_lote") {
-        return sendMessage(phone, "📦 Informe: tipo, raça, peso, idade, sexo e quantidade.");
+        if (!animais.length)
+            return sendMessage(phone, `📭 O lote ${intent.numero_lote} está vazio.`);
+
+        let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
+
+        animais.forEach(a => {
+            txt += `🐂 ${a.tipo}\nPeso: ${a.peso} kg\nRaça: ${a.raca}\nSexo: ${a.sexo}\nQtd: ${a.quantidade}\n\n`;
+        });
+
+        return sendMessage(phone, txt);
     }
 
     // =============================================================
-    // 🔮 GPT USADO APENAS PARA INTERPRETAÇÃO COMPLEXA
+    // 🔮 GPT – USADO APENAS QUANDO O NLP NÃO SABE A INTENÇÃO
     // =============================================================
 
     const history = await getConversationHistory(phone, 6);
@@ -252,7 +291,7 @@ app.post("/webhook", async (req, res) => {
         resposta = completion.choices[0].message.content;
 
     } catch (e) {
-        return sendMessage(phone, "❌ Erro com GPT.");
+        return sendMessage(phone, "❌ Erro ao processar IA.");
     }
 
     // Interpretar JSON
@@ -263,9 +302,9 @@ app.post("/webhook", async (req, res) => {
         try { json = JSON.parse(jsonMatch[0]); } catch {}
     }
 
-    // ================================
-    // Execução final das ações JSON
-    // ================================
+    // ===================================================
+    // 🟦 EXECUÇÃO FINAL DAS AÇÕES JSON
+    // ===================================================
 
     if (json) {
 
@@ -278,50 +317,58 @@ app.post("/webhook", async (req, res) => {
                 raca: json.raca,
                 peso: json.peso,
                 idade: json.idade,
-                notas: json.observacao || ""
+                notas: json.notas || ""
             });
             return sendMessage(phone, "🐮 Animal registrado com sucesso!");
         }
 
         // Atualizar animal
         if (json.acao === "atualizar_animal") {
-            await updateAnimalDB(json.id, {
+            await updateAnimalDB(json.numero_boi, {
                 peso: json.peso,
                 idade: json.idade,
                 raca: json.raca,
-                notas: json.observacao
+                notas: json.notas
             });
-            return sendMessage(phone, "✔ Animal atualizado!");
+            return sendMessage(phone, "🔄 Animal atualizado com sucesso!");
         }
 
         // Deletar animal
         if (json.acao === "deletar_animal") {
-            await deleteAnimalDB(json.id);
-            return sendMessage(phone, "🗑️ Animal removido!");
+            await deleteAnimalDB(json.numero_boi);
+            return sendMessage(phone, "🗑️ Animal deletado com sucesso!");
         }
 
         // Adicionar lote
         if (json.acao === "adicionar_lote") {
-            await addAnimalToLote(phone, json.numero_lote, json.tipo, json.raca, json.peso, json.idade, json.sexo, json.quantidade, json.observacao);
+            await addAnimalToLote(
+                phone,
+                json.numero_lote,
+                json.tipo,
+                json.raca,
+                json.peso,
+                json.idade,
+                json.sexo,
+                json.quantidade,
+                json.observacao
+            );
             return sendMessage(phone, `📦🐮 Animal adicionado ao lote ${json.numero_lote}!`);
         }
 
-        // Listar lote via GPT
+        // Listar lote via JSON
         if (json.acao === "listar_lote") {
             const animais = await getLote(phone, json.numero_lote);
+
             if (!animais.length)
                 return sendMessage(phone, `📭 O lote ${json.numero_lote} está vazio.`);
 
             let txt = `📦 *Lote ${json.numero_lote}*\n\n`;
-            animais.forEach(a => {
-                txt += `🐂 ${a.tipo} - ${a.peso}kg\n`;
-            });
-
+            animais.forEach(a => txt += `🐂 ${a.tipo} - ${a.peso}kg\n`);
             return sendMessage(phone, txt);
         }
     }
 
-    // Caso GPT gerou texto normal
+    // Sem JSON → resposta normal
     return sendMessage(phone, resposta);
 });
 

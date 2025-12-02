@@ -1,6 +1,6 @@
 // ==============================================
-// 📦 BANCO DE DADOS – Versão Supabase
-// Conversão completa de SQLite → Supabase
+// 📦 BANCO DE DADOS – Versão Supabase (PT-BR)
+// Totalmente compatível com o index.js em português
 // ==============================================
 
 import supabase from "./supabase.js";
@@ -9,9 +9,8 @@ import supabase from "./supabase.js";
 // 1️⃣ USERS
 // ==============================================
 
-// Buscar usuário
 export async function getUser(phone) {
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from("users")
         .select("*")
         .eq("phone", phone)
@@ -20,7 +19,6 @@ export async function getUser(phone) {
     return data || null;
 }
 
-// Criar usuário
 export async function createUser(phone, name = null) {
     await supabase.from("users").insert([
         {
@@ -32,7 +30,6 @@ export async function createUser(phone, name = null) {
     ]);
 }
 
-// Atualizar usuário
 export async function updateUser(phone, fields) {
     await supabase
         .from("users")
@@ -91,19 +88,35 @@ export async function getDiagnostics(phone) {
     return data || [];
 }
 
-// SALVAR animal no Supabase
-export async function salvarAnimalDB({ telefone,numero_boi, nome, raca, peso, idade, notas }) {
+// ==============================================
+// 4️⃣ ANIMAIS (CAMPOS EM PORTUGUÊS)
+// ==============================================
+//
+// IMPORTANTE → seu Supabase precisa indicar estes campos:
+//
+// id (PK)
+// owner_phone (text)
+// numero_boi (int)
+// nome (text)
+// raca (text)
+// peso (numeric)
+// idade (int)
+// notas (text)
+// created_at (timestamp)
+//
+
+export async function salvarAnimalDB({ telefone, numero_boi, nome, raca, peso, idade, notas }) {
     const { error } = await supabase
         .from("animals")
         .insert([
             {
                 owner_phone: telefone,
-                name: nome,
-                animal_number: numero_boi,
-                breed: raca,
-                weight: peso,
-                age: idade,
-                notes: notas,
+                numero_boi,
+                nome,
+                raca,
+                peso,
+                idade,
+                notas,
                 created_at: new Date().toISOString()
             }
         ]);
@@ -131,11 +144,12 @@ export async function getAnimalsByUser(owner_phone) {
     return data || [];
 }
 
-export async function updateAnimalDB(id, updates) {
+// Atualizar animal pelo NUMERO_BOI
+export async function updateAnimalDB(numero_boi, updates) {
     const { error } = await supabase
         .from("animals")
         .update(updates)
-        .eq("id", id);
+        .eq("numero_boi", numero_boi);
 
     if (error) {
         console.log("❌ Erro ao atualizar animal:", error);
@@ -145,11 +159,11 @@ export async function updateAnimalDB(id, updates) {
     return true;
 }
 
-export async function deleteAnimalDB(id) {
+export async function deleteAnimalDB(numero_boi) {
     const { error } = await supabase
         .from("animals")
         .delete()
-        .eq("id", id);
+        .eq("numero_boi", numero_boi);
 
     if (error) {
         console.log("❌ Erro ao deletar animal:", error);
@@ -160,13 +174,27 @@ export async function deleteAnimalDB(id) {
 }
 
 // ==============================================
-// 5️⃣ LOTES (SISTEMA NOVO)
+// 5️⃣ LOTES
 // ==============================================
+//
+// Sua tabela `lotes` deve ter:
+//
+// id
+// user_number
+// numero_lote
+// tipo
+// raca
+// peso
+// idade
+// sexo
+// quantidade
+// observacao
+// created_at
+//
 
-// Inserir animal no lote
 export async function addAnimalToLote(
     user,
-    lote,
+    numero_lote,
     tipo,
     raca,
     peso,
@@ -175,10 +203,10 @@ export async function addAnimalToLote(
     quantidade,
     observacao
 ) {
-    await supabase.from("lotes").insert([
+    const { error } = await supabase.from("lotes").insert([
         {
             user_number: user,
-            numero_lote: lote,
+            numero_lote,
             tipo,
             raca,
             peso,
@@ -189,32 +217,33 @@ export async function addAnimalToLote(
             created_at: new Date().toISOString()
         }
     ]);
+
+    if (error) {
+        console.log("❌ Erro ao adicionar ao lote:", error);
+    }
 }
 
-// Listar todos os lotes do usuário
 export async function getAllLotes(user) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("lotes")
         .select("numero_lote, quantidade")
         .eq("user_number", user);
 
-    if (!data) return [];
+    if (error || !data) return [];
 
-    // Agrupa por lote
+    // Agrupar soma por lote
     const grupos = {};
-
     data.forEach(item => {
         if (!grupos[item.numero_lote]) grupos[item.numero_lote] = 0;
         grupos[item.numero_lote] += item.quantidade;
     });
 
-    return Object.entries(grupos).map(([lote, total]) => ({
-        numero_lote: lote,
-        total_animais: total
+    return Object.entries(grupos).map(([numero_lote, total_animais]) => ({
+        numero_lote,
+        total_animais
     }));
 }
 
-// Listar animais de um lote
 export async function getLote(user, lote) {
     const { data } = await supabase
         .from("lotes")
