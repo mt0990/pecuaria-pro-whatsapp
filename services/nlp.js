@@ -1,6 +1,6 @@
 // =============================================================
-// 🤖 NLP PRO v3 — Pecuária Pro (PT-BR)
-// Detector de intenções inteligente, limpo e profissional
+// 🤖 NLP PRO v4 — Pecuária Pro (PT-BR)
+// 100% compatível com SEU index.js atual
 // =============================================================
 
 export function detectarIntencao(message) {
@@ -9,57 +9,130 @@ export function detectarIntencao(message) {
     const t = message.toLowerCase().trim();
 
     // ---------------------------------------------------------
-    // NÚMEROS AUTOMÁTICOS
+    // EXTRAÇÃO DE NÚMEROS AUTOMÁTICOS
     // ---------------------------------------------------------
-    const num = t.match(/\d+/) ? Number(t.match(/\d+/)[0]) : null;
-
-    // ---------------------------------------------------------
-    // LOTES
-    // ---------------------------------------------------------
-
-    // listar lote 1
-    if (t.includes("lote") && t.includes("listar") && num)
-        return { intent: "listar_lote", numero_lote: num };
-
-    // listar todos os lotes
-    if (t.includes("listar lotes") || t.includes("meus lotes"))
-        return { intent: "listar_lotes" };
-
-    // adicionar ao lote 2
-    if (t.includes("adicionar") && t.includes("lote") && num)
-        return { intent: "adicionar_lote", numero_lote: num };
+    const numeroEncontrado = t.match(/\d+/);
+    const numero = numeroEncontrado ? Number(numeroEncontrado[0]) : null;
 
     // ---------------------------------------------------------
-    // CRUD ANIMAIS
+    // INTENÇÕES — AÇÕES SIMPLES (SEM GPT)
+    // Estas intenções chamam blocos DIRETOS do seu index.js
     // ---------------------------------------------------------
 
-    if (t.includes("cadastrar animal") || t.includes("novo animal"))
-        return { intent: "registrar_animal" };
+    // DIETA
+    if (
+        t.includes("dieta") ||
+        t.includes("ração") ||
+        t.includes("alimentação")
+    ) {
+        return { intent: "dieta" };
+    }
 
-    if (t.includes("listar animais") || t.includes("meus animais"))
+    // UA
+    if (
+        t.includes("ua") ||
+        t.includes("unidade animal")
+    ) {
+        return { intent: "ua" };
+    }
+
+    // ARROBA
+    if (
+        t.includes("arroba") ||
+        t.includes("custo da arroba") ||
+        t.includes("preço arroba")
+    ) {
+        return { intent: "arroba" };
+    }
+
+    // LISTAR ANIMAIS
+    if (
+        t.includes("listar animais") ||
+        t.includes("meus animais") ||
+        t.includes("mostrar animais")
+    ) {
         return { intent: "listar_animais" };
-
-    if (t.includes("atualizar animal") || t.includes("editar animal"))
-        return { intent: "atualizar_animal", numero_boi: num };
-
-    if (t.includes("deletar animal") || t.includes("remover animal"))
-        return { intent: "deletar_animal", numero_boi: num };
+    }
 
     // ---------------------------------------------------------
-    // CÁLCULOS
+    // LOTES — COMPATÍVEL COM index.js
     // ---------------------------------------------------------
 
-    if (t.includes("dieta"))
-        return { intent: "diet" };
+    // "listar lote 3"
+    if (
+        (t.includes("listar lote") ||
+            t.includes("mostrar lote") ||
+            t.includes("ver lote")) &&
+        numero
+    ) {
+        return { intent: "listar_lote", numero_lote: numero };
+    }
 
-    if (t.includes("ua"))
-        return { intent: "ua_calc" };
+    // "listar lotes"
+    if (
+        t.includes("listar lotes") ||
+        t.includes("meus lotes") ||
+        t.includes("ver lotes") ||
+        t.includes("mostrar lotes")
+    ) {
+        return { intent: "listar_lotes" };
+    }
 
-    if (t.includes("arroba"))
-        return { intent: "arroba_cost" };
+    // "adicionar ao lote 2"
+    if (
+        t.includes("adicionar") &&
+        t.includes("lote") &&
+        numero
+    ) {
+        return {
+            intent: "adicionar_lote",
+            numero_lote: numero
+        };
+    }
+
+    // Caso diga "adicionar ao lote" sem número
+    if (
+        t.includes("adicionar ao lote") ||
+        (t.includes("adicionar") && t.includes("lote"))
+    ) {
+        return { intent: "adicionar_lote", numero_lote: null };
+    }
 
     // ---------------------------------------------------------
-    // FALLBACK → GPT resolve
+    // CRUD ANIMAIS — COMPATÍVEL COM index.js
+    // ---------------------------------------------------------
+
+    // CADASTRAR ANIMAL
+    if (
+        t.includes("cadastrar animal") ||
+        t.includes("registrar animal") ||
+        (t.includes("novo") && t.includes("animal"))
+    ) {
+        return { intent: "registrar_animal" };
+    }
+
+    // ATUALIZAR ANIMAL
+    if (
+        (t.includes("editar animal") ||
+            t.includes("atualizar animal") ||
+            t.includes("alterar animal")) &&
+        numero
+    ) {
+        return { intent: "atualizar_animal", numero_boi: numero };
+    }
+
+    // DELETAR ANIMAL
+    if (
+        (t.includes("deletar animal") ||
+            t.includes("remover animal") ||
+            t.includes("excluir animal")) &&
+        numero
+    ) {
+        return { intent: "deletar_animal", numero_boi: numero };
+    }
+
+    // ---------------------------------------------------------
+    // FALLBACK — GPT resolve
     // ---------------------------------------------------------
     return { intent: "gpt" };
 }

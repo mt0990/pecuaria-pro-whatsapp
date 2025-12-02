@@ -77,11 +77,15 @@ const client = new OpenAI({
 // Função de envio
 // =========================================
 
-async function sendMessage(phone, message) {
+async function sendMessage(phone, message, userName = null) {
     try {
+        const finalMessage = userName
+            ? message.replace("{nome}", userName)
+            : message;
+
         await axios.post(
             `${ULTRA_API_URL}/${ULTRA_INSTANCE_ID}/messages/chat`,
-            { to: phone, body: message },
+            { to: phone, body: finalMessage },
             { params: { token: ULTRA_TOKEN } }
         );
     } catch (err) {
@@ -96,7 +100,6 @@ async function sendMessage(phone, message) {
 const systemPrompt = `
 Você é o assistente da PECUÁRIA PRO em português.
 
-Sempre que necessario utilize o nome do usuario nas conversas.
 ⚠️ SOMENTE envie JSON quando:
 - O usuário pedir explicitamente para cadastrar, atualizar, deletar, listar animais ou lotes.
 - Quando a intenção for claramente uma AÇÃO.
@@ -298,10 +301,11 @@ Obs: ${a.observacao || "nenhuma"}\n\n`;
     const history = await getConversationHistory(phone, 6);
 
     const messages = [
-        { role: "system", content: systemPrompt },
-        ...history.map(h => ({ role: h.role, content: h.message })),
-        { role: "user", content: message }
-    ];
+    { role: "system", content: systemPrompt },
+    { role: "system", content: `Nome do usuário: ${user?.name || "produtor"}` },
+    ...history.map(h => ({ role: h.role, content: h.message })),
+    { role: "user", content: message }
+];
 
     let resposta = "";
 
