@@ -1,22 +1,23 @@
-// ==============================================
-// 📦 BANCO DE DADOS – Versão Supabase (PT-BR)
-// Totalmente compatível com o index.js em português
-// ==============================================
+// ==============================================================
+// 📦 BANCO DE DADOS – Supabase (PT-BR)
+// Compatível com index.js final e JSON do GPT
+// ==============================================================
 
 import supabase from "./supabase.js";
 
-// ==============================================
-// 1️⃣ USERS
-// ==============================================
+// ==============================================================
+// 1️⃣ TABELA USERS
+// ==============================================================
 
 export async function getUser(phone) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("users")
         .select("*")
         .eq("phone", phone)
         .single();
 
-    return data || null;
+    if (error) return null;
+    return data;
 }
 
 export async function createUser(phone, name = null) {
@@ -37,9 +38,9 @@ export async function updateUser(phone, fields) {
         .eq("phone", phone);
 }
 
-// ==============================================
-// 2️⃣ CONVERSAS
-// ==============================================
+// ==============================================================
+// 2️⃣ TABELA CONVERSATIONS
+// ==============================================================
 
 export async function addConversation(phone, role, message) {
     await supabase.from("conversations").insert([
@@ -53,19 +54,20 @@ export async function addConversation(phone, role, message) {
 }
 
 export async function getConversationHistory(phone, limit = 10) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("conversations")
         .select("role, message")
         .eq("phone", phone)
         .order("id", { ascending: false })
         .limit(limit);
 
-    return data ? data.reverse() : [];
+    if (!data) return [];
+    return data.reverse(); // Mantém ordem cronológica correta
 }
 
-// ==============================================
-// 3️⃣ DIAGNÓSTICOS
-// ==============================================
+// ==============================================================
+// 3️⃣ TABELA DIAGNOSTICS
+// ==============================================================
 
 export async function saveDiagnostic(phone, category, payload) {
     await supabase.from("diagnostics").insert([
@@ -79,30 +81,31 @@ export async function saveDiagnostic(phone, category, payload) {
 }
 
 export async function getDiagnostics(phone) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("diagnostics")
         .select("*")
         .eq("phone", phone)
         .order("id", { ascending: false });
 
-    return data || [];
+    if (error) return [];
+    return data;
 }
 
-// ==============================================
-// 4️⃣ ANIMAIS (CAMPOS EM PORTUGUÊS)
-// ==============================================
+// ==============================================================
+// 4️⃣ TABELA ANIMALS (PT-BR) — usando numero_boi
+// ==============================================================
 //
-// IMPORTANTE → seu Supabase precisa indicar estes campos:
+// CAMPOS OBRIGATÓRIOS NO SUPABASE:
 //
-// id (PK)
-// owner_phone (text)
-// numero_boi (int)
-// nome (text)
-// raca (text)
-// peso (numeric)
-// idade (int)
-// notas (text)
-// created_at (timestamp)
+// id              (serial PK)
+// owner_phone     text
+// numero_boi      int
+// nome            text
+// raca            text
+// peso            numeric
+// idade           int
+// notas           text
+// created_at      timestamptz
 //
 
 export async function salvarAnimalDB({ telefone, numero_boi, nome, raca, peso, idade, notas }) {
@@ -125,7 +128,6 @@ export async function salvarAnimalDB({ telefone, numero_boi, nome, raca, peso, i
         console.log("❌ Erro ao salvar animal:", error);
         return false;
     }
-
     return true;
 }
 
@@ -134,17 +136,12 @@ export async function getAnimalsByUser(owner_phone) {
         .from("animals")
         .select("*")
         .eq("owner_phone", owner_phone)
-        .order("id", { ascending: true });
+        .order("numero_boi", { ascending: true });
 
-    if (error) {
-        console.log("❌ Erro ao buscar animais:", error);
-        return [];
-    }
-
-    return data || [];
+    if (error) return [];
+    return data;
 }
 
-// Atualizar animal pelo NUMERO_BOI
 export async function updateAnimalDB(numero_boi, updates) {
     const { error } = await supabase
         .from("animals")
@@ -173,11 +170,11 @@ export async function deleteAnimalDB(numero_boi) {
     return true;
 }
 
-// ==============================================
-// 5️⃣ LOTES
-// ==============================================
+// ==============================================================
+// 5️⃣ TABELA LOTES — Sistema de grupos de animais
+// ==============================================================
 //
-// Sua tabela `lotes` deve ter:
+// CAMPOS NO SUPABASE:
 //
 // id
 // user_number
@@ -218,9 +215,7 @@ export async function addAnimalToLote(
         }
     ]);
 
-    if (error) {
-        console.log("❌ Erro ao adicionar ao lote:", error);
-    }
+    if (error) console.log("❌ Erro ao adicionar ao lote:", error);
 }
 
 export async function getAllLotes(user) {
@@ -231,7 +226,7 @@ export async function getAllLotes(user) {
 
     if (error || !data) return [];
 
-    // Agrupar soma por lote
+    // Agrupar animais por lote
     const grupos = {};
     data.forEach(item => {
         if (!grupos[item.numero_lote]) grupos[item.numero_lote] = 0;
@@ -245,12 +240,13 @@ export async function getAllLotes(user) {
 }
 
 export async function getLote(user, lote) {
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("lotes")
         .select("*")
         .eq("user_number", user)
         .eq("numero_lote", lote)
         .order("id", { ascending: true });
 
-    return data || [];
+    if (error) return [];
+    return data;
 }
