@@ -92,13 +92,14 @@ export async function getDiagnostics(phone) {
 }
 
 // SALVAR animal no Supabase
-export async function salvarAnimalDB({ telefone, nome, raca, peso, idade, notas }) {
+export async function salvarAnimalDB({ telefone,numero_boi, nome, raca, peso, idade, notas }) {
     const { error } = await supabase
         .from("animals")
         .insert([
             {
                 owner_phone: telefone,
                 name: nome,
+                animal_number: numero_boi,
                 breed: raca,
                 weight: peso,
                 age: idade,
