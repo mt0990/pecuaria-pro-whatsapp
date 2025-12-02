@@ -94,10 +94,17 @@ async function sendMessage(phone, message) {
 // =========================================
 
 const systemPrompt = `
-Você é o assistente da PECUÁRIA PRO.
+Você é o assistente da PECUÁRIA PRO em português.
 
-QUANDO o usuário pedir para cadastrar, atualizar, deletar ou adicionar em lote,
-VOCÊ DEVE RESPONDER EM JSON neste formato:
+⚠️ SOMENTE envie JSON quando:
+- O usuário pedir explicitamente para cadastrar, atualizar, deletar, listar animais ou lotes.
+- Quando a intenção for claramente uma AÇÃO.
+
+⚠️ SE a pergunta for informativa, explicativa, dúvida, conversa, curiosidade, assunto técnico, doença, vacina, manejo, pasto, reprodução:
+➡️ NUNCA envie JSON.
+➡️ Responda normalmente em TEXTO.
+
+📌 AÇÕES PERMITIDAS (JSON):
 
 1) registrar_animal:
 {
@@ -151,9 +158,9 @@ VOCÊ DEVE RESPONDER EM JSON neste formato:
   "numero_lote": 0
 }
 
-NUNCA envie JSON fora desse padrão.
-NUNCA envie JSON incompleto.
-NUNCA invente campos.
+⚠️ IMPORTANTE ⚠️  
+Nunca envie JSON se a intenção NÃO for uma ação.
+Para qualquer dúvida, explicação, pergunta ou conversa → responda somente em texto.         
 `;
 
 // =========================================
@@ -302,17 +309,31 @@ app.post("/webhook", async (req, res) => {
 
     let json = null;
     const regex = /\{[\s\S]*?\}/g;
-    const matches = resposta.match(regex);
+const matches = resposta.match(regex);
 
-    if (matches) {
-        for (const bloco of matches) {
-            try {
-                const parsed = JSON.parse(bloco);
-                if (parsed.acao) json = parsed;
-            } catch {}
-        }
+if (matches) {
+    for (const bloco of matches) {
+        try {
+            const parsed = JSON.parse(bloco);
+
+            // Aceita JSON SOMENTE SE TIVER UMA AÇÃO VÁLIDA
+            const acoesValidas = [
+                "registrar_animal",
+                "listar_animais",
+                "atualizar_animal",
+                "deletar_animal",
+                "adicionar_lote",
+                "listar_lotes",
+                "listar_lote"
+            ];
+
+            if (parsed.acao && acoesValidas.includes(parsed.acao)) {
+                json = parsed;
+            }
+
+        } catch {}
     }
-
+}
     // -------------------------------------------
     // EXECUTAR AÇÕES DO JSON
     // -------------------------------------------
