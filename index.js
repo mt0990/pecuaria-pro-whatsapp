@@ -233,33 +233,46 @@ app.post("/webhook", async (req, res) => {
 
     // Listar animais
     if (intent.intent === "listar_animais") {
-        const animais = await getAnimalsByUser(phone);
+    const animais = await getAnimalsByUser(phone);
 
-        if (!animais.length)
-            return sendMessage(phone, "Você ainda não tem animais cadastrados.");
+    if (!animais.length)
+        return sendMessage(phone, "📭 Você não tem animais cadastrados.");
 
-        let txt = "🐮 *Seus animais cadastrados*\n\n";
-        animais.forEach(a => {
-            txt += `• #${a.numero_boi} - ${a.nome}\nRaça: ${a.raca}\nPeso: ${a.peso}kg\nIdade: ${a.idade}\nNotas: ${a.notas}\n\n`;
-        });
+    let txt = "🐮 *Seus animais cadastrados*\n\n";
 
-        return sendMessage(phone, txt);
-    }
+    animais.forEach(a => {
+        txt += `• Boi #${a.numero_boi}
+📌 Nome: ${a.nome}
+🐄 Raça: ${a.raca || "não informada"}
+⚖️ Peso: ${a.peso} kg
+📅 Idade: ${a.idade} ano(s)
+📝 Obs: ${a.notas || "nenhuma"}\n\n`;
+    });
+
+    return sendMessage(phone, txt);
+}
 
     // Listar lotes
-    if (intent.intent === "listar_lotes") {
-        const lotes = await getAllLotes(phone);
+    if (intent.intent === "listar_lote" && intent.numero_lote) {
+    const animais = await getLote(phone, intent.numero_lote);
 
-        if (!lotes.length)
-            return sendMessage(phone, "Você não possui lotes cadastrados.");
+    if (!animais.length)
+        return sendMessage(phone, `📭 O lote ${intent.numero_lote} está vazio.`);
 
-        let txt = "📦 *Seus lotes*\n\n";
-        lotes.forEach(l => {
-            txt += `• Lote ${l.numero_lote}: ${l.total_animais} animais\n`;
-        });
+    let txt = `📦 *Lote ${intent.numero_lote}*\n\n`;
 
-        return sendMessage(phone, txt);
-    }
+    animais.forEach(a => {
+        txt += `🐂 ${a.tipo}
+Raça: ${a.raca || "não informada"}
+Peso: ${a.peso} kg
+Idade: ${a.idade} ano(s)
+Sexo: ${a.sexo}
+Quantidade: ${a.quantidade}
+Obs: ${a.observacao || "nenhuma"}\n\n`;
+    });
+
+    return sendMessage(phone, txt);
+}
 
     // Listar lote com número
     if (intent.intent === "listar_lote" && intent.numero_lote) {
@@ -319,12 +332,16 @@ if (matches) {
             // Aceita JSON SOMENTE SE TIVER UMA AÇÃO VÁLIDA
             const acoesValidas = [
                 "registrar_animal",
+                "adicionar_animal",
                 "listar_animais",
+                "mostrar_animais",
                 "atualizar_animal",
                 "deletar_animal",
                 "adicionar_lote",
                 "listar_lotes",
-                "listar_lote"
+                "listar_lote",
+                "mostre_lote",
+                "quero_ver_lote"
             ];
 
             if (parsed.acao && acoesValidas.includes(parsed.acao)) {
