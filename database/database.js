@@ -1,23 +1,22 @@
 // ==============================================================
-// 📦 BANCO DE DADOS – Supabase (PT-BR)
-// Compatível com index.js final e JSON do GPT
+// 📦 BANCO DE DADOS — Supabase (PT-BR)
+// Revisado e 100% seguro
 // ==============================================================
 
 import supabase from "./supabase.js";
 
 // ==============================================================
-// 1️⃣ TABELA USERS
+// 1️⃣ USERS
 // ==============================================================
 
 export async function getUser(phone) {
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from("users")
         .select("*")
         .eq("phone", phone)
         .single();
 
-    if (error) return null;
-    return data;
+    return data || null;
 }
 
 export async function createUser(phone, name = null) {
@@ -39,7 +38,7 @@ export async function updateUser(phone, fields) {
 }
 
 // ==============================================================
-// 2️⃣ TABELA CONVERSATIONS
+// 2️⃣ CONVERSATIONS
 // ==============================================================
 
 export async function addConversation(phone, role, message) {
@@ -54,19 +53,18 @@ export async function addConversation(phone, role, message) {
 }
 
 export async function getConversationHistory(phone, limit = 10) {
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from("conversations")
         .select("role, message")
         .eq("phone", phone)
         .order("id", { ascending: false })
         .limit(limit);
 
-    if (!data) return [];
-    return data.reverse(); // Mantém ordem cronológica correta
+    return data ? data.reverse() : [];
 }
 
 // ==============================================================
-// 3️⃣ TABELA DIAGNOSTICS
+// 3️⃣ DIAGNOSTICS
 // ==============================================================
 
 export async function saveDiagnostic(phone, category, payload) {
@@ -81,116 +79,80 @@ export async function saveDiagnostic(phone, category, payload) {
 }
 
 export async function getDiagnostics(phone) {
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from("diagnostics")
         .select("*")
         .eq("phone", phone)
         .order("id", { ascending: false });
 
-    if (error) return [];
-    return data;
+    return data || [];
 }
 
 // ==============================================================
-// 4️⃣ TABELA ANIMALS (PT-BR) — usando numero_boi
+// 4️⃣ ANIMALS
 // ==============================================================
-//
-// CAMPOS OBRIGATÓRIOS NO SUPABASE:
-//
-// id              (serial PK)
-// owner_phone     text
-// numero_boi      int
-// nome            text
-// raca            text
-// peso            numeric
-// idade           int
-// notas           text
-// created_at      timestamptz
-//
 
-export async function salvarAnimalDB({ telefone, numero_boi, nome, raca, peso, idade, notas }) {
-    const { error } = await supabase
-        .from("animals")
-        .insert([
-            {
-                owner_phone: telefone,
-                numero_boi,
-                nome,
-                raca,
-                peso,
-                idade,
-                notas,
-                created_at: new Date().toISOString()
-            }
-        ]);
+export async function salvarAnimalDB({
+    telefone,
+    numero_boi,
+    nome,
+    raca,
+    peso,
+    idade,
+    notas
+}) {
+    const { error } = await supabase.from("animals").insert([
+        {
+            owner_phone: telefone,
+            numero_boi,
+            nome,
+            raca,
+            peso,
+            idade,
+            notas,
+            created_at: new Date().toISOString()
+        }
+    ]);
 
-    if (error) {
-        console.log("❌ Erro ao salvar animal:", error);
-        return false;
-    }
-    return true;
+    if (error) console.log("❌ Erro ao salvar animal:", error);
 }
 
 export async function getAnimalsByUser(owner_phone) {
-    const { data, error } = await supabase
+    const { data } = await supabase
         .from("animals")
         .select("*")
         .eq("owner_phone", owner_phone)
         .order("numero_boi", { ascending: true });
 
-    if (error) return [];
-    return data;
+    return data || [];
 }
 
-export async function updateAnimalDB(numero_boi, updates) {
+export async function updateAnimalDB(phone, numero_boi, updates) {
     const { error } = await supabase
         .from("animals")
         .update(updates)
-        .eq("numero_boi", numero_boi);
+        .eq("numero_boi", numero_boi)
+        .eq("owner_phone", phone); // 👈 segurança
 
-    if (error) {
-        console.log("❌ Erro ao atualizar animal:", error);
-        return false;
-    }
-
-    return true;
+    if (error) console.log("❌ Erro ao atualizar animal:", error);
 }
 
-export async function deleteAnimalDB(numero_boi) {
+export async function deleteAnimalDB(phone, numero_boi) {
     const { error } = await supabase
         .from("animals")
         .delete()
-        .eq("numero_boi", numero_boi);
+        .eq("numero_boi", numero_boi)
+        .eq("owner_phone", phone); // 👈 segurança
 
-    if (error) {
-        console.log("❌ Erro ao deletar animal:", error);
-        return false;
-    }
-
-    return true;
+    if (error) console.log("❌ Erro ao deletar animal:", error);
 }
 
 // ==============================================================
-// 5️⃣ TABELA LOTES — Sistema de grupos de animais
+// 5️⃣ LOTES
 // ==============================================================
-//
-// CAMPOS NO SUPABASE:
-//
-// id
-// user_number
-// numero_lote
-// tipo
-// raca
-// peso
-// idade
-// sexo
-// quantidade
-// observacao
-// created_at
-//
 
 export async function addAnimalToLote(
-    user,
+    userPhone,
     numero_lote,
     tipo,
     raca,
@@ -202,7 +164,7 @@ export async function addAnimalToLote(
 ) {
     const { error } = await supabase.from("lotes").insert([
         {
-            user_number: user,
+            user_number: userPhone,
             numero_lote,
             tipo,
             raca,
@@ -218,15 +180,14 @@ export async function addAnimalToLote(
     if (error) console.log("❌ Erro ao adicionar ao lote:", error);
 }
 
-export async function getAllLotes(user) {
-    const { data, error } = await supabase
+export async function getAllLotes(userPhone) {
+    const { data } = await supabase
         .from("lotes")
         .select("numero_lote, quantidade")
-        .eq("user_number", user);
+        .eq("user_number", userPhone);
 
-    if (error || !data) return [];
+    if (!data) return [];
 
-    // Agrupar animais por lote
     const grupos = {};
     data.forEach(item => {
         if (!grupos[item.numero_lote]) grupos[item.numero_lote] = 0;
@@ -234,19 +195,18 @@ export async function getAllLotes(user) {
     });
 
     return Object.entries(grupos).map(([numero_lote, total_animais]) => ({
-        numero_lote,
+        numero_lote: Number(numero_lote),
         total_animais
     }));
 }
 
-export async function getLote(user, lote) {
-    const { data, error } = await supabase
+export async function getLote(userPhone, lote) {
+    const { data } = await supabase
         .from("lotes")
         .select("*")
-        .eq("user_number", user)
+        .eq("user_number", userPhone)
         .eq("numero_lote", lote)
         .order("id", { ascending: true });
 
-    if (error) return [];
-    return data;
+    return data || [];
 }
