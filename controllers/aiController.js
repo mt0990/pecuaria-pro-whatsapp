@@ -1,126 +1,92 @@
-// =========================================
-// 🤖 AI CONTROLLER – GPT + JSON + AÇÕES
-// =========================================
-
 import OpenAI from "openai";
+import { sendMessage } from "../services/whatsapp.js";
 
-import { 
+import {
     registrarAnimal,
     atualizarAnimal,
     deletarAnimal,
     listarAnimais
 } from "./animalController.js";
 
-import {
-    adicionarAoLote,
-    listarLote,
-    listarTodosLotes
-} from "./loteController.js";
+import { adicionarAoLote, listarTodosLotes } from "./loteController.js";
+import { recuperarHistorico } from "./userController.js";
 
-import {
-    recuperarHistorico
-} from "./userController.js";
-
-import { sendMessage } from "../services/whatsapp.js";
-
-// =========================================
-// GPT INIT
-// =========================================
 const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-// =========================================
-// SYSTEM PROMPT (SEGURO)
-// =========================================
+// ------------------------------------------------------
+// SYSTEM PROMPT v5 — MODO ESPECIALISTA COMPLETO
+// ------------------------------------------------------
 const systemPrompt = `
-Você é o assistente oficial da PECUÁRIA PRO.
+Você é o assistente oficial da Pecuária Pro.
+Comporta-se como Zootecnista e Veterinário especialista.
 
-⚠️ REGRAS IMPORTANTES:
-- NUNCA envie JSON ao listar lote individual.
-- Apenas responda "OK" se o usuário pedir para listar lote 1, lote 2, etc.
-- O servidor executa essa ação localmente.
-- JSON só é permitido para:
+📌 Estilo de resposta:
+- Explicações completas, claras e detalhadas.
+- Sempre pedagógico.
+- Sempre recomenda veterinário no final.
+- Nunca envia respostas curtas como "OK", "Certo", "Sim".
+- Nunca envia JSON exceto ações do sistema.
 
+📌 JSON permitido SOMENTE para:
 1) registrar_animal
 2) atualizar_animal
 3) deletar_animal
 4) listar_animais
 5) adicionar_lote
-6) listar_lotes (todos)
-
-⚠️ Se o usuário perguntar algo sobre:
-- doenças
-- manejo
-- pastagem
-- nutrição
-- vacinas
-- curiosidades
-→ responda em texto normal.
-
-Se JSON for usado, ele DEVE seguir este formato:
-
-{
-  "acao": "registrar_animal",
-  ...
-}
-
-Somente isso. Não adicione texto fora do JSON.
+6) listar_lotes
 `;
 
-// =========================================
-// PROCESSADOR GPT PRINCIPAL
-// =========================================
+// ------------------------------------------------------
+// PROCESSAMENTO PRINCIPAL GPT
+// ------------------------------------------------------
 export async function processAI(phone, message, userName) {
     try {
-        // Histórico
         const history = await recuperarHistorico(phone, 6);
 
         const messages = [
             { role: "system", content: systemPrompt },
-            { role: "system", content: `Nome do usuário: ${userName || "produtor"}` },
+            { role: "system", content: `Nome do usuário: ${userName}` },
             ...history.map(h => ({ role: h.role, content: h.message })),
             { role: "user", content: message }
         ];
 
-        // Chama GPT
         const completion = await client.chat.completions.create({
             model: "gpt-4o-mini",
             messages
         });
 
-        const resposta = completion.choices[0].message.content;
+        let resposta = completion.choices[0].message.content.trim();
 
-        // Tenta extrair JSON
-        const json = extrairJSONSeguro(resposta);
-
-        if (!json) {
-            // Apenas texto normal
-            return sendMessage(phone, resposta);
+        // Anti-resposta curta
+        if (resposta.length < 15) {
+            resposta = "Entendi! Pode me explicar melhor para que eu possa ajudar de forma completa?";
         }
 
-        // JSON válido → executar ação
+        // Tentar extrair JSON
+        const json = extrairJSONSeguro(resposta);
+        if (!json) return sendMessage(phone, resposta);
+
         return executarAcaoJSON(phone, json);
 
     } catch (err) {
-        console.error("Erro no AI Controller:", err);
-        return sendMessage(phone, "⚠️ Erro ao processar sua solicitação.");
+        console.error("Erro no AI:", err);
+        return sendMessage(phone, "⚠️ Ocorreu um erro ao processar sua solicitação.");
     }
 }
 
-// =========================================
-// EXTRATOR DE JSON SEGURO
-// =========================================
-function extrairJSONSeguro(texto) {
+// ------------------------------------------------------
+// EXTRATOR DE JSON
+// ------------------------------------------------------
+function extrairJSONSeguro(text) {
     try {
-        const regex = /\{[\s\S]*?\}/g;
-        const bloco = texto.match(regex);
+        const match = text.match(/\{[\s\S]*?\}/g);
+        if (!match) return null;
 
-        if (!bloco) return null;
-
-        for (const b of bloco) {
+        for (const bloco of match) {
             try {
-                const json = JSON.parse(b);
+                const json = JSON.parse(bloco);
 
                 const acoesValidas = [
                     "registrar_animal",
@@ -131,11 +97,9 @@ function extrairJSONSeguro(texto) {
                     "listar_lotes"
                 ];
 
-                if (json?.acao && acoesValidas.includes(json.acao)) {
-                    return json;
-                }
+                if (acoesValidas.includes(json?.acao)) return json;
 
-            } catch {}
+            } catch { }
         }
 
         return null;
@@ -145,31 +109,17 @@ function extrairJSONSeguro(texto) {
     }
 }
 
-// =========================================
-// EXECUTOR DE AÇÕES JSON
-// =========================================
+// ------------------------------------------------------
+// EXECUTOR DE AÇÕES
+// ------------------------------------------------------
 async function executarAcaoJSON(phone, json) {
-
     switch (json.acao) {
-        case "registrar_animal":
-            return registrarAnimal(phone, json);
-
-        case "atualizar_animal":
-            return atualizarAnimal(phone, json);
-
-        case "deletar_animal":
-            return deletarAnimal(phone, json.numero_boi);
-
-        case "listar_animais":
-            return listarAnimais(phone);
-
-        case "adicionar_lote":
-            return adicionarAoLote(phone, json);
-
-        case "listar_lotes":
-            return listarTodosLotes(phone);
-
-        default:
-            return sendMessage(phone, "⚠️ Ação não reconhecida.");
+        case "registrar_animal": return registrarAnimal(phone, json);
+        case "atualizar_animal": return atualizarAnimal(phone, json);
+        case "deletar_animal": return deletarAnimal(phone, json.numero_boi);
+        case "listar_animais": return listarAnimais(phone);
+        case "adicionar_lote": return adicionarAoLote(phone, json);
+        case "listar_lotes": return listarTodosLotes(phone);
+        default: return sendMessage(phone, "⚠️ Ação desconhecida.");
     }
 }

@@ -1,13 +1,14 @@
-// =========================================
-// 📞 WHATSAPP SERVICE – Fluxo Principal
-// =========================================
-
 import axios from "axios";
 import dotenv from "dotenv";
 
 import { detectarIntencao } from "./nlp.js";
 
-import { 
+import {
+    mostrarMenu,
+    processarOpcaoMenu
+} from "../controllers/menuController.js";
+
+import {
     handleDieta,
     handleUA,
     handleArroba,
@@ -20,10 +21,7 @@ import {
     registrarConversacao
 } from "../controllers/userController.js";
 
-import { 
-    listarLote, 
-    listarTodosLotes 
-} from "../controllers/loteController.js";
+import { listarLote, listarTodosLotes } from "../controllers/loteController.js";
 
 import { processAI } from "../controllers/aiController.js";
 
@@ -51,7 +49,7 @@ export async function sendMessage(phone, message) {
 }
 
 // =========================================
-// 📩 PROCESSAR MENSAGEM PRINCIPAL
+// 📩 Processamento principal
 // =========================================
 export async function processIncomingMessage(body) {
     try {
@@ -75,40 +73,33 @@ export async function processIncomingMessage(body) {
         const intent = detectarIntencao(message);
 
         // =========================================
-        // AÇÕES DIRETAS
+        // 🎯 MENU INTELIGENTE
+        // =========================================
+        if (intent.intent === "menu")
+            return mostrarMenu(phone);
+
+        // Usuário digitou uma opção numérica do menu (0–9)
+        if (!isNaN(message) && message.length === 1)
+            return processarOpcaoMenu(phone, message);
+
+        // =========================================
+        // 🎯 AÇÕES DIRETAS (SEM GPT)
         // =========================================
         if (intent.intent === "dieta") return handleDieta(phone, message);
         if (intent.intent === "ua") return handleUA(phone, message);
         if (intent.intent === "arroba") return handleArroba(phone, message);
         if (intent.intent === "lotacao") return handleLotacao(phone, message);
 
-        // LOTES
-        if (intent.intent === "listar_lote" && intent.numero_lote) {
+        if (intent.intent === "listar_lote" && intent.numero_lote)
             return listarLote(phone, intent.numero_lote);
-        }
 
-        if (intent.intent === "listar_lote" && !intent.numero_lote) {
-            return sendMessage(phone, "Qual número do lote?");
-        }
-
-        if (intent.intent === "listar_lotes") {
+        if (intent.intent === "listar_lotes")
             return listarTodosLotes(phone);
-        }
-
-        // REGISTRO / ATUALIZAÇÃO / DELETE DE ANIMAL VIA NLP
-        if ([
-            "registrar_animal",
-            "atualizar_animal",
-            "deletar_animal",
-            "adicionar_lote"
-        ].includes(intent.intent)) {
-            return processAI(phone, message, user.name, intent);
-        }
 
         // =========================================
-        // GPT (AI CONTROLLER)
+        // 🤖 GPT resolve
         // =========================================
-        return processAI(phone, message, user.name, intent);
+        return processAI(phone, message, user.name);
 
     } catch (err) {
         console.error("Erro no WhatsApp Service:", err);
