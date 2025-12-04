@@ -7,14 +7,16 @@ import { falarComGPT } from "../controllers/aiController.js";
 
 export async function processarMensagem(phone, msg) {
 
+    msg = msg.trim().toLowerCase();
+
     // Comandos universais
     if (/^(menu|ajuda|help)$/i.test(msg)) {
         await mostrarMenu(phone);
         return null;
     }
 
-    // Se digitou número → menu
-    if (/^\d$/.test(msg)) {
+    // Opções do menu (1 a 9)
+    if (/^[0-9]$/.test(msg)) {
         return await processarOpcaoMenu(phone, msg);
     }
 
@@ -34,7 +36,7 @@ export async function processarMensagem(phone, msg) {
         return await criarLote(phone, nome);
     }
 
-    // Adicionar animal ao lote
+    // Adicionar ao lote
     if (msg.startsWith("adicionar ao lote")) {
         const partes = msg.split(" ");
         const lote = partes[3];
@@ -48,11 +50,12 @@ export async function processarMensagem(phone, msg) {
     if (msg.includes("lotacao")) return await calcularLotacao(phone, msg);
     if (msg.includes("arroba")) return await custoPorArroba(phone, msg);
 
-    // Diagnóstico
-    if (msg.length > 20 && !/gpt|menu/.test(msg)) {
-        return await diagnosticoAnimal(phone, msg);
+    // Diagnóstico (somente se o usuário vier do menu)
+    if (msg.startsWith("diagnosticar")) {
+        const texto = msg.replace("diagnosticar", "").trim();
+        return await diagnosticoAnimal(phone, texto);
     }
 
-    // Modo GPT
+    // Chat GPT geral
     return await falarComGPT(phone, msg);
 }

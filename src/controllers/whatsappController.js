@@ -3,6 +3,7 @@ import { sendMessage } from "../services/whatsapp.js";
 import { usuarioExiste, registrarUser } from "./userController.js";
 import { mensagemBoasVindas } from "../utils/welcome.js";
 import { mostrarMenu } from "./menuController.js";
+import { listarAnimais } from "./animalController.js";
 
 export async function handleIncoming(req, res, next) {
     try {
@@ -10,7 +11,7 @@ export async function handleIncoming(req, res, next) {
         const phone = data.from;
         const mensagem = data.body.trim();
 
-        // Primeiro acesso
+        // Primeiro acesso do usuário
         const existe = await usuarioExiste(phone);
         if (!existe) {
             await registrarUser(phone);
@@ -22,7 +23,21 @@ export async function handleIncoming(req, res, next) {
         // Processamento normal
         const resposta = await processarMensagem(phone, mensagem);
 
-        if (resposta) await sendMessage(phone, resposta);
+        // SE A RESPOSTA FOR UMA AÇÃO DO MENU
+        if (typeof resposta === "object" && resposta.acao) {
+
+            if (resposta.acao === "listar_animais") {
+                await listarAnimais(phone);
+                return res.status(200).json({ status: "ok" });
+            }
+
+            return res.status(200).json({ status: "ok" });
+        }
+
+        // Resposta normal
+        if (resposta) {
+            await sendMessage(phone, resposta);
+        }
 
         return res.status(200).json({ status: "ok" });
 
