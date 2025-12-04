@@ -2,41 +2,23 @@ import supabase from "../database/supabase.js";
 import { sendMessage } from "../services/whatsapp.js";
 
 // ------------------------------
-// 🧠 Função inteligente para extrair dados
+// 🧠 Função inteligente para extrair dados (MULTILINHAS)
 // ------------------------------
 function parseAnimalData(text) {
-    const linhas = text.split("\n").map(l => l.trim()).filter(l => l);
 
-    // Remove o comando "registrar animal"
-    linhas[0] = linhas[0].replace(/registrar animal/i, "").trim();
+    let linhas = text.split("\n").map(l => l.trim()).filter(l => l);
 
-    const texto = linhas.join(" ");
+    if (linhas[0].toLowerCase().includes("registrar animal")) {
+        linhas.shift();
+    }
 
-    // Nome
-    const nome = texto.split(" ")[0] || "SemNome";
+    const nome = linhas[0] || "SemNome";
+    const raca = linhas[1] || "Desconhecida";
+    const peso = linhas[2] ? linhas[2].replace(/[^0-9]/g, "") : null;
+    const idade = linhas[3] || null;
+    const notas = linhas.slice(4).join(" ") || "";
 
-    // Raça = tudo após nome até chegarem números
-    const raca = texto.match(/[a-zA-ZÀ-ú]+( [a-zA-ZÀ-ú]+)*/)?.[0] || "Desconhecida";
-
-    // Peso
-    const pesoRegex = /(\d+)\s*(kg|quilo|kilo)?/i;
-    const peso = texto.match(pesoRegex)?.[1] || null;
-
-    // Idade
-const idadeRegex = /(\d+)\s*(ano|anos|mês|meses|dia|dias)?/i;
-const idadeMatch = texto.match(idadeRegex);
-const idade = idadeMatch ? idadeMatch[0] : null;
-
-// Notas
-const notas = texto
-    .replace(raca, "")
-    .replace(pesoRegex, "")
-    .replace(idadeRegex, "")
-    .replace(nome, "")
-    .trim() || "";
-
-// Retornar dados corretamente
-return { nome, raca, peso, idade, notas };
+    return { nome, raca, peso, idade, notas };
 }
 
 // ------------------------------
