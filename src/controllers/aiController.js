@@ -1,6 +1,9 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import OpenAI from "openai";
 import { logError, logInfo } from "../utils/logger.js";
-import { sendMessage } from "./whatsapp.js";
+import { sendMessage } from "../services/whatsapp.js";
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
@@ -27,7 +30,12 @@ Mensagem do usuário:
 
         logInfo("🧠 GPT respondeu com sucesso", { phone });
 
-        return response.output_text;
+        const texto =
+            response.output_text ||
+            response.output?.[0]?.content?.[0]?.text ||
+            "Não consegui gerar resposta.";
+
+        return texto;
 
     } catch (err) {
 
