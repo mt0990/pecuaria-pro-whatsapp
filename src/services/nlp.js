@@ -1,9 +1,31 @@
-import { mostrarMenu, processarOpcaoMenu } from "../controllers/menuController.js";
-import { registrarAnimal, listarAnimais } from "../controllers/animalController.js";
-import { criarLote, adicionarAoLote } from "../controllers/loteController.js";
+import { 
+    mostrarMenu, 
+    processarOpcaoMenu,
+    mostrarMenuAnimais,
+    mostrarMenuLotes,
+    mostrarMenuCalculos,
+    mostrarMenuDiagnostico,
+    mostrarMenuGPT
+} from "../controllers/menuController.js";
+
+import { 
+    registrarAnimal, 
+    listarAnimais,
+    editarAnimal,
+    removerAnimal
+} from "../controllers/animalController.js";
+
+import { 
+    criarLote, 
+    listarLotes,
+    adicionarAoLote,
+    removerDoLote,
+    deletarLote
+} from "../controllers/loteController.js";
+
 import { calcularDieta, calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
 import { diagnosticoAnimal } from "../controllers/diagnosticoController.js";
-import { respostaGPT } from "./gpt.js";   // ✔️ AJUSTADO
+import { respostaGPT } from "./gpt.js";
 import { sendMessage } from "../services/whatsapp.js";
 
 import { logInfo, logError } from "../utils/logger.js";
@@ -15,76 +37,147 @@ export async function processarMensagem(phone, msg) {
     const texto = msg.toLowerCase().trim();
 
     try {
-
+        // -------------------------------------------------------------------
+        // 0 — MENU PRINCIPAL A QUALQUER MOMENTO
+        // -------------------------------------------------------------------
         if (/(menu|ajuda|help)/.test(texto)) {
-            await mostrarMenu(phone);
-            return null;
+            return await mostrarMenu(phone);
         }
 
+
+        // -------------------------------------------------------------------
+        // 1 — MENU PRINCIPAL → OPÇÕES GRANDES (1–5)
+        // -------------------------------------------------------------------
         if (/^\d$/.test(texto)) {
             const resposta = await processarOpcaoMenu(phone, texto);
 
-            if (resposta?.acao === "listar_animais") {
-                return await listarAnimais(phone);
-            }
+            if (resposta?.submenu === "animais") return mostrarMenuAnimais(phone);
+            if (resposta?.submenu === "lotes") return mostrarMenuLotes(phone);
+            if (resposta?.submenu === "calculos") return mostrarMenuCalculos(phone);
+            if (resposta?.submenu === "diagnostico") return mostrarMenuDiagnostico(phone);
+            if (resposta?.submenu === "gpt") return mostrarMenuGPT(phone);
+
             return resposta;
         }
 
-        if (texto.startsWith("registrar animal"))
-            return await registrarAnimal(phone, msg);
 
-        if (texto === "listar animais")
-            return await listarAnimais(phone);
+        // -------------------------------------------------------------------
+        // 2 — SUBMENUS (1.1, 2.3, 3.4 etc.)
+        // -------------------------------------------------------------------
+        if (/^\d+\.\d+$/.test(texto)) {
+            const resposta = await processarOpcaoMenu(phone, texto);
 
+            if (resposta?.acao === "listar_animais") return listarAnimais(phone);
+            if (resposta?.acao === "listar_lotes") return listarLotes(phone);
+
+            return resposta;
+        }
+
+
+        // -------------------------------------------------------------------
+        // 3 — COMANDOS DIRETOS
+        // -------------------------------------------------------------------
+
+        // 🔹 Registrar animal
+        if (texto.startsWith("registrar animal")) {
+            return registrarAnimal(phone, msg);
+        }
+
+        // 🔹 Editar animal
+        if (texto.startsWith("editar animal")) {
+            return editarAnimal(phone, msg);
+        }
+
+        // 🔹 Remover animal
+        if (texto.startsWith("remover animal")) {
+            return removerAnimal(phone, msg);
+        }
+
+        // 🔹 Listar animais
+        if (texto === "listar animais") {
+            return listarAnimais(phone);
+        }
+
+        // 🔹 Criar lote
         if (texto.startsWith("criar lote")) {
             const nome = texto.replace("criar lote", "").trim();
-            return await criarLote(phone, nome);
+            return criarLote(phone, nome);
         }
 
+        // 🔹 Listar lotes
+        if (texto === "listar lotes") {
+            return listarLotes(phone);
+        }
+
+        // 🔹 Adicionar animal ao lote
         if (texto.startsWith("adicionar ao lote")) {
             const partes = texto.split(" ");
-            return await adicionarAoLote(phone, partes[3], partes[4]);
+            return adicionarAoLote(phone, partes[3], partes[4]);
         }
 
-        if (texto.includes("dieta"))
-            return await calcularDieta(phone, msg);
+        // 🔹 Remover animal do lote
+        if (texto.startsWith("remover do lote")) {
+            const partes = texto.split(" ");
+            return removerDoLote(phone, partes[3], partes[4]);
+        }
 
-        if (texto.includes("ua ") || texto === "ua")
-            return await calcularUA(phone, msg);
+        // 🔹 Deletar lote
+        if (texto.startsWith("remover lote")) {
+            const nome = texto.replace("remover lote", "").trim();
+            return deletarLote(phone, nome);
+        }
 
-        if (texto.includes("lotacao"))
-            return await calcularLotacao(phone, msg);
 
-        if (texto.includes("arroba"))
-            return await custoPorArroba(phone, msg);
+        // -------------------------------------------------------------------
+        // 4 — CÁLCULOS E MÉTRICAS
+        // -------------------------------------------------------------------
+        if (texto.includes("dieta")) return calcularDieta(phone, msg);
 
-        // 🔹 Diagnóstico automático — SOMENTE se não for comando
-const comandosReconhecidos = [
-    "registrar animal",
-    "listar animais",
-    "criar lote",
-    "adicionar ao lote",
-    "dieta",
-    "ua",
-    "arroba",
-    "lotacao"
-];
+        if (texto.includes("ua ") || texto === "ua") return calcularUA(phone, msg);
 
-const ehComando = comandosReconhecidos.some(cmd => texto.startsWith(cmd));
+        if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
 
-if (!ehComando && msg.length > 25 && !texto.includes("gpt")) {
-    logInfo("➡️ Diagnóstico automático ativado", { phone });
-    return await diagnosticoAnimal(phone, msg);
-}
+        if (texto.includes("arroba")) return custoPorArroba(phone, msg);
 
-        // 🔹 enviar para GPT
-        return await respostaGPT(phone, msg);
+
+        // -------------------------------------------------------------------
+        // 5 — DIAGNÓSTICO AUTOMÁTICO
+        // -------------------------------------------------------------------
+        const comandosReconhecidos = [
+            "registrar animal",
+            "editar animal",
+            "remover animal",
+            "listar animais",
+            "criar lote",
+            "listar lotes",
+            "adicionar ao lote",
+            "remover do lote",
+            "remover lote",
+            "dieta",
+            "ua",
+            "arroba",
+            "lotacao"
+        ];
+
+        const ehComando = comandosReconhecidos.some(cmd => texto.startsWith(cmd));
+
+        if (!ehComando && msg.length > 25 && !texto.includes("gpt")) {
+            logInfo("➡️ Diagnóstico automático ativado", { phone });
+            return diagnosticoAnimal(phone, msg);
+        }
+
+
+        // -------------------------------------------------------------------
+        // 6 — GPT (fallback final)
+        // -------------------------------------------------------------------
+        return respostaGPT(phone, msg);
+
 
     } catch (err) {
 
         logError(err, { phone, msg, local: "processarMensagem" });
 
-        return await sendMessage(
+        return sendMessage(
             phone,
             "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."
         );

@@ -1,29 +1,43 @@
 import supabase from "../database/supabase.js";
 import { sendMessage } from "../services/whatsapp.js";
 
-// ------------------------------
-// 🧠 Função inteligente para extrair dados (MULTILINHAS)
-// ------------------------------
+// =======================================================
+// 🧠 Função inteligente para extrair dados (linha única ou multilinhas)
+// =======================================================
 function parseAnimalData(text) {
 
-    let linhas = text.split("\n").map(l => l.trim()).filter(l => l);
+    // Remove "registrar animal"
+    text = text.replace(/registrar animal/i, "").trim();
 
-    if (linhas[0].toLowerCase().includes("registrar animal")) {
-        linhas.shift();
-    }
+    // Divide por espaço OU por linhas
+    const partes = text.split(/\s+|\n/).filter(p => p.trim());
 
-    const nome = linhas[0] || "SemNome";
-    const raca = linhas[1] || "Desconhecida";
-    const peso = linhas[2] ? linhas[2].replace(/[^0-9]/g, "") : null;
-    const idade = linhas[3] || null;
-    const notas = linhas.slice(4).join(" ") || "";
+    const nome = partes[0] || "SemNome";
+    const raca = partes[1] || "Desconhecida";
+
+    // Peso: aceita 350, 350kg, 350KG, 350-quilos etc.
+    const pesoMatch = text.match(/(\d{2,4})\s*(kg|quilo|kilo)?/i);
+    const peso = pesoMatch ? Number(pesoMatch[1]) : null;
+
+    // Idade: aceita "2 anos", "3meses", "4 dias"
+    const idadeMatch = text.match(/\d+\s*(ano|anos|m[eê]s|meses|dia|dias)/i);
+    const idade = idadeMatch ? idadeMatch[0] : null;
+
+    // Notas = resto do texto
+    const notas = text
+        .replace(nome, "")
+        .replace(raca, "")
+        .replace(pesoMatch?.[0] || "", "")
+        .replace(idadeMatch?.[0] || "", "")
+        .trim();
 
     return { nome, raca, peso, idade, notas };
 }
 
-// ------------------------------
+
+// =======================================================
 // 🐮 Registrar Animal
-// ------------------------------
+// =======================================================
 export async function registrarAnimal(phone, msg) {
     try {
         const { nome, raca, peso, idade, notas } = parseAnimalData(msg);
@@ -35,7 +49,7 @@ export async function registrarAnimal(phone, msg) {
                     phone,
                     nome,
                     raca,
-                    peso: peso ? Number(peso) : null,
+                    peso,
                     idade,
                     notas
                 }
@@ -51,9 +65,10 @@ export async function registrarAnimal(phone, msg) {
     }
 }
 
-// ------------------------------
+
+// =======================================================
 // 📋 Listar Animais
-// ------------------------------
+// =======================================================
 export async function listarAnimais(phone) {
     try {
         const { data, error } = await supabase
@@ -84,5 +99,76 @@ Notas: ${a.notas || "—"}
     } catch (err) {
         console.error(err);
         return sendMessage(phone, "❌ *Erro ao listar animais.*");
+    }
+}
+
+
+// =======================================================
+// ✏️ Editar Animal
+// =======================================================
+export async function editarAnimal(phone, msg) {
+    try {
+        const partes = msg.split(" ");
+
+        // editar animal ID campo valor...
+        // ex: editar animal 5 peso 410
+
+        const id = Number(partes[2]);
+        const campo = partes[3];
+        const valor = partes.slice(4).join(" ");
+
+        if (!id || isNaN(id)) {
+            return sendMessage(phone, "❌ ID inválido.");
+        }
+
+        const camposPermitidos = ["nome", "raca", "peso", "idade", "notas"];
+
+        if (!camposPermitidos.includes(campo)) {
+            return sendMessage(phone, "❌ Campo inválido! Use: nome, raca, peso, idade, notas.");
+        }
+
+        const valorFinal = campo === "peso" ? Number(valor) : valor;
+
+        const { error } = await supabase
+            .from("animals")
+            .update({ [campo]: valorFinal })
+            .eq("id", id)
+            .eq("phone", phone);
+
+        if (error) throw error;
+
+        return sendMessage(phone, `✅ *Animal ${id} atualizado com sucesso!*`);
+
+    } catch (err) {
+        console.error("Erro ao editar animal:", err);
+        return sendMessage(phone, "❌ Erro ao editar animal.");
+    }
+}
+
+
+// =======================================================
+// ❌ Remover Animal
+// =======================================================
+export async function removerAnimal(phone, msg) {
+    try {
+        // remover animal 5
+        const partes = msg.split(" ");
+        const id = Number(partes[2]);
+
+        if (!id) return sendMessage(phone, "❌ Envie: remover animal ID");
+
+        const { error } = await supabase
+            .from("animals")
+            .delete()
+            .eq("id", id)
+            .eq("phone", phone);
+
+        if (error) throw error;
+
+        return sendMessage(phone, `🗑️ *Animal ${id} removido com sucesso!*`);
+
+    } catch (err) {
+        console.error("Erro ao remover animal:", err);
+        return sendMessage(phone, "❌ Erro ao remover animal.");
     }
 }
