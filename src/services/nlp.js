@@ -3,108 +3,73 @@ import { registrarAnimal, listarAnimais } from "../controllers/animalController.
 import { criarLote, adicionarAoLote } from "../controllers/loteController.js";
 import { calcularDieta, calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
 import { diagnosticoAnimal } from "../controllers/diagnosticoController.js";
-import { falarComGPT } from "../controllers/aiController.js";
+import { respostaGPT } from "./gpt.js";   // ✔️ AJUSTADO
 import { sendMessage } from "../services/whatsapp.js";
 
-import { logInfo, logError } from "../utils/logger.js";  // ✅ ADICIONE ISTO
+import { logInfo, logError } from "../utils/logger.js";
 
 export async function processarMensagem(phone, msg) {
 
-    logInfo("📩 Mensagem recebida", { phone, msg });  // ✅ Log da entrada
+    logInfo("📩 Mensagem recebida", { phone, msg });
 
     const texto = msg.toLowerCase().trim();
 
     try {
 
-        // 🔹 Comandos universais
         if (/(menu|ajuda|help)/.test(texto)) {
-            logInfo("➡️ Usuário pediu MENU", { phone });
             await mostrarMenu(phone);
             return null;
         }
 
-        // 🔹 Opções de menu (número)
         if (/^\d$/.test(texto)) {
-            logInfo("➡️ Usuário escolheu opção do MENU", { phone, opcao: texto });
-
             const resposta = await processarOpcaoMenu(phone, texto);
 
             if (resposta?.acao === "listar_animais") {
                 return await listarAnimais(phone);
             }
-
             return resposta;
         }
 
-        // 🔹 Registrar animal
-        if (texto.startsWith("registrar animal")) {
-            logInfo("➡️ Registrar animal", { phone });
+        if (texto.startsWith("registrar animal"))
             return await registrarAnimal(phone, msg);
-        }
 
-        // 🔹 Listar animais
-        if (texto === "listar animais") {
-            logInfo("➡️ Listar animais", { phone });
+        if (texto === "listar animais")
             return await listarAnimais(phone);
-        }
 
-        // 🔹 Criar lote
         if (texto.startsWith("criar lote")) {
             const nome = texto.replace("criar lote", "").trim();
-            logInfo("➡️ Criar lote", { phone, nome });
             return await criarLote(phone, nome);
         }
 
-        // 🔹 Adicionar ao lote
         if (texto.startsWith("adicionar ao lote")) {
             const partes = texto.split(" ");
-            const lote = partes[3];
-            const animalId = partes[4];
-
-            logInfo("➡️ Adicionar ao lote", { phone, lote, animalId });
-
-            return await adicionarAoLote(phone, lote, animalId);
+            return await adicionarAoLote(phone, partes[3], partes[4]);
         }
 
-        // 🔹 Dieta
-        if (texto.includes("dieta")) {
-            logInfo("➡️ Calcular dieta", { phone });
+        if (texto.includes("dieta"))
             return await calcularDieta(phone, msg);
-        }
 
-        // 🔹 UA
-        if (texto.includes("ua ") || texto === "ua") {
-            logInfo("➡️ Calcular UA", { phone });
+        if (texto.includes("ua ") || texto === "ua")
             return await calcularUA(phone, msg);
-        }
 
-        // 🔹 Lotação
-        if (texto.includes("lotacao")) {
-            logInfo("➡️ Calcular lotação", { phone });
+        if (texto.includes("lotacao"))
             return await calcularLotacao(phone, msg);
-        }
 
-        // 🔹 Arroba
-        if (texto.includes("arroba")) {
-            logInfo("➡️ Custo por arroba", { phone });
+        if (texto.includes("arroba"))
             return await custoPorArroba(phone, msg);
-        }
 
-        // 🔹 Diagnóstico automático
-        if (msg.length > 25 && !texto.includes("gpt")) {
-            logInfo("➡️ Diagnóstico", { phone });
+        if (msg.length > 25 && !texto.includes("gpt"))
             return await diagnosticoAnimal(phone, msg);
-        }
 
-        // 🔹 Falar com GPT
-        logInfo("➡️ Enviando para GPT", { phone, msg });
-        return await falarComGPT(phone, msg);
+        // 🔹 enviar para GPT
+        return await respostaGPT(phone, msg);
 
     } catch (err) {
-        // ❌ Captura qualquer erro inesperado no fluxo
+
         logError(err, { phone, msg, local: "processarMensagem" });
 
-        return await sendMessage(phone,
+        return await sendMessage(
+            phone,
             "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."
         );
     }
