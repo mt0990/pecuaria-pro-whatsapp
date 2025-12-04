@@ -1,14 +1,17 @@
+import { logError } from "./logger.js";
+
 // =============================================
-// 🛑 TRATAMENTO GLOBAL DE ERROS
+// 🛑 TRATAMENTO GLOBAL DE ERROS (MIDDLEWARE FINAL)
 // =============================================
 
 export default function errorHandler(err, req, res, next) {
 
-    console.error("🔥 ERRO INTERNO:", {
-        mensagem: err.message,
-        stack: err.stack,
+    logError(err, {
         rota: req.originalUrl,
-        corpo: req.body
+        metodo: req.method,
+        corpo: req.body,
+        params: req.params,
+        query: req.query
     });
 
     return res.status(500).json({
