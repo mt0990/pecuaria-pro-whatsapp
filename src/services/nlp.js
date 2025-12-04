@@ -7,15 +7,15 @@ import { falarComGPT } from "../controllers/aiController.js";
 
 export async function processarMensagem(phone, msg) {
 
-    msg = msg.trim().toLowerCase();
+    msg = msg.toLowerCase().trim();
 
-    // Comandos universais
-    if (/^(menu|ajuda|help)$/i.test(msg)) {
+    // Comando universal
+    if (msg === "menu") {
         await mostrarMenu(phone);
-        return null;
+        return null;  // NÃO ENVIA MENU 2x
     }
 
-    // Opções do menu (1 a 9)
+    // Usuário digitou número do menu
     if (/^[0-9]$/.test(msg)) {
         return await processarOpcaoMenu(phone, msg);
     }
@@ -27,21 +27,18 @@ export async function processarMensagem(phone, msg) {
 
     // Listar animais
     if (msg === "listar animais") {
-        return await listarAnimais(phone);
+        return { acao: "listar_animais" };
     }
 
     // Criar lote
     if (msg.startsWith("criar lote")) {
-        const nome = msg.replace("criar lote", "").trim();
-        return await criarLote(phone, nome);
+        return await criarLote(phone, msg.replace("criar lote", "").trim());
     }
 
-    // Adicionar ao lote
+    // Adicionar animal ao lote
     if (msg.startsWith("adicionar ao lote")) {
         const partes = msg.split(" ");
-        const lote = partes[3];
-        const animalId = partes[4];
-        return await adicionarAoLote(phone, lote, animalId);
+        return await adicionarAoLote(phone, partes[3], partes[4]);
     }
 
     // Cálculos
@@ -50,12 +47,11 @@ export async function processarMensagem(phone, msg) {
     if (msg.includes("lotacao")) return await calcularLotacao(phone, msg);
     if (msg.includes("arroba")) return await custoPorArroba(phone, msg);
 
-    // Diagnóstico (somente se o usuário vier do menu)
-    if (msg.startsWith("diagnosticar")) {
-        const texto = msg.replace("diagnosticar", "").trim();
-        return await diagnosticoAnimal(phone, texto);
+    // Diagnóstico
+    if (msg.length > 20 && !msg.includes("gpt")) {
+        return await diagnosticoAnimal(phone, msg);
     }
 
-    // Chat GPT geral
+    // Modo GPT
     return await falarComGPT(phone, msg);
 }

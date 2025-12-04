@@ -21,13 +21,28 @@ Escolha uma opção enviando APENAS o número:
 
 export async function processarOpcaoMenu(phone, opcao) {
     switch (opcao) {
-        case "1": return "Envie: registrar animal nome raça peso idade notas";
-        case "2": return { acao: "listar_animais" };
-        case "3": return "Envie: criar lote nome_do_lote";
-        case "4": return "Envie: adicionar ao lote nome_do_lote id_do_animal";
-        case "5": return "Envie: dieta, ua, arroba ou lotacao";
-        case "9": return "Envie os sintomas do animal.";
-        case "0": return "Modo GPT ativado! Envie sua pergunta.";
-        default: return "❌ Opção inválida. Digite apenas números de 0 a 9.";
+        case "1":
+            return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
+
+        case "2":
+            return { acao: "listar_animais" };
+
+        case "3":
+            return "📌 Envie: criar lote nome_do_lote";
+
+        case "4":
+            return "📌 Envie: adicionar ao lote nome_do_lote id_do_animal";
+
+        case "5":
+            return "📌 Envie: dieta, ua, arroba ou lotacao";
+
+        case "9":
+            return "📌 Envie os sintomas do animal.";
+
+        case "0":
+            return "🤖 Modo GPT ativado! Envie sua pergunta.";
+
+        default:
+            return "❌ Opção inválida. Digite apenas números de 0 a 9.";
     }
 }
