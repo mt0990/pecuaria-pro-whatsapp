@@ -132,7 +132,7 @@ export async function updateAnimalDB(phone, numero_boi, updates) {
         .from("animals")
         .update(updates)
         .eq("numero_boi", numero_boi)
-        .eq("owner_phone", phone); // 👈 segurança
+        .eq("owner_phone", phone);
 
     if (error) console.log("❌ Erro ao atualizar animal:", error);
 }
@@ -142,7 +142,7 @@ export async function deleteAnimalDB(phone, numero_boi) {
         .from("animals")
         .delete()
         .eq("numero_boi", numero_boi)
-        .eq("owner_phone", phone); // 👈 segurança
+        .eq("owner_phone", phone);
 
     if (error) console.log("❌ Erro ao deletar animal:", error);
 }
