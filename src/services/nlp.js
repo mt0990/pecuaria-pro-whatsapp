@@ -58,8 +58,24 @@ export async function processarMensagem(phone, msg) {
         if (texto.includes("arroba"))
             return await custoPorArroba(phone, msg);
 
-        if (msg.length > 25 && !texto.includes("gpt"))
-            return await diagnosticoAnimal(phone, msg);
+        // 🔹 Diagnóstico automático — SOMENTE se não for comando
+const comandosReconhecidos = [
+    "registrar animal",
+    "listar animais",
+    "criar lote",
+    "adicionar ao lote",
+    "dieta",
+    "ua",
+    "arroba",
+    "lotacao"
+];
+
+const ehComando = comandosReconhecidos.some(cmd => texto.startsWith(cmd));
+
+if (!ehComando && msg.length > 25 && !texto.includes("gpt")) {
+    logInfo("➡️ Diagnóstico automático ativado", { phone });
+    return await diagnosticoAnimal(phone, msg);
+}
 
         // 🔹 enviar para GPT
         return await respostaGPT(phone, msg);
