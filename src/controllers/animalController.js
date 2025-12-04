@@ -1,25 +1,50 @@
 import supabase from "../database/supabase.js";
 import { sendMessage } from "../services/whatsapp.js";
 
-/**
- * REGISTRAR ANIMAL
- * Formato esperado:
- * registrar animal boi mestiço 349kg 1ano saudável dócil etc...
- */
-export async function registrarAnimal(phone, dados) {
+// ------------------------------
+// 🧠 Função inteligente para extrair dados
+// ------------------------------
+function parseAnimalData(text) {
+    const linhas = text.split("\n").map(l => l.trim()).filter(l => l);
+
+    // Remove o comando "registrar animal"
+    linhas[0] = linhas[0].replace(/registrar animal/i, "").trim();
+
+    const texto = linhas.join(" ");
+
+    // Nome
+    const nome = texto.split(" ")[0] || "SemNome";
+
+    // Raça = tudo após nome até chegarem números
+    const raca = texto.match(/[a-zA-ZÀ-ú]+( [a-zA-ZÀ-ú]+)*/)?.[0] || "Desconhecida";
+
+    // Peso
+    const pesoRegex = /(\d+)\s*(kg|quilo|kilo)?/i;
+    const peso = texto.match(pesoRegex)?.[1] || null;
+
+    // Idade
+const idadeRegex = /(\d+)\s*(ano|anos|mês|meses|dia|dias)?/i;
+const idadeMatch = texto.match(idadeRegex);
+const idade = idadeMatch ? idadeMatch[0] : null;
+
+// Notas
+const notas = texto
+    .replace(raca, "")
+    .replace(pesoRegex, "")
+    .replace(idadeRegex, "")
+    .replace(nome, "")
+    .trim() || "";
+
+// Retornar dados corretamente
+return { nome, raca, peso, idade, notas };
+}
+
+// ------------------------------
+// 🐮 Registrar Animal
+// ------------------------------
+export async function registrarAnimal(phone, msg) {
     try {
-        const texto = dados.replace("registrar animal", "").trim();
-        const partes = texto.split(" ");
-
-        if (partes.length < 4) {
-            return sendMessage(phone, "❌ Formato inválido.\nUse:\nregistrar animal nome raça peso idade notas");
-        }
-
-        const nome = partes[0];
-        const raca = partes[1];
-        const peso = partes[2]?.replace("kg", "").replace(",", ".") || null;
-        const idade = partes[3];
-        const notas = partes.slice(4).join(" ");
+        const { nome, raca, peso, idade, notas } = parseAnimalData(msg);
 
         const { error } = await supabase
             .from("animals")
@@ -28,7 +53,7 @@ export async function registrarAnimal(phone, dados) {
                     phone,
                     nome,
                     raca,
-                    peso: Number(peso),
+                    peso: peso ? Number(peso) : null,
                     idade,
                     notas
                 }
@@ -36,46 +61,46 @@ export async function registrarAnimal(phone, dados) {
 
         if (error) throw error;
 
-        return sendMessage(phone, "✅ Animal registrado com sucesso!");
+        return sendMessage(phone, "✅ *Animal registrado com sucesso!*");
 
     } catch (err) {
-        console.error(err);
-        return sendMessage(phone, "❌ Erro ao registrar animal. Verifique os dados enviados.");
+        console.error("Erro ao registrar animal:", err);
+        return sendMessage(phone, "❌ *Erro ao registrar animal. Verifique os dados enviados.*");
     }
 }
 
-/**
- * LISTAR ANIMAIS
- */
+// ------------------------------
+// 📋 Listar Animais
+// ------------------------------
 export async function listarAnimais(phone) {
     try {
         const { data, error } = await supabase
             .from("animals")
             .select("*")
-            .eq("phone", phone);
+            .eq("phone", phone)
+            .order("id", { ascending: true });
 
         if (error) throw error;
 
-        if (!data.length) {
-            return sendMessage(phone, "📭 Você ainda não tem animais cadastrados.");
-        }
+        if (!data.length)
+            return sendMessage(phone, "📭 *Você ainda não tem animais cadastrados.*");
 
         let texto = "🐮 *SEUS ANIMAIS:*\n\n";
 
         data.forEach(a => {
-            texto += `➡️ ID: ${a.id}\n`;
-            texto += `• Nome: ${a.nome}\n`;
-            texto += `• Raça: ${a.raca}\n`;
-            texto += `• Peso: ${a.peso} kg\n`;
-            texto += `• Idade: ${a.idade}\n`;
-            if (a.notas) texto += `• Notas: ${a.notas}\n`;
-            texto += `\n`;
+            texto += `ID: ${a.id}
+Nome: ${a.nome}
+Raça: ${a.raca}
+Peso: ${a.peso || "—"} kg
+Idade: ${a.idade || "—"}
+Notas: ${a.notas || "—"}
+---------------------\n`;
         });
 
         return sendMessage(phone, texto);
 
     } catch (err) {
         console.error(err);
-        return sendMessage(phone, "❌ Erro ao listar animais.");
+        return sendMessage(phone, "❌ *Erro ao listar animais.*");
     }
 }

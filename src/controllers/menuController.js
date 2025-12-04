@@ -4,7 +4,7 @@ export async function mostrarMenu(phone) {
     const texto = `
 📋 *MENU PRINCIPAL — Pecuária Pro*
 
-Escolha uma opção enviando APENAS o número:
+Escolha uma opção enviando apenas o número:
 
 1️⃣ Registrar animal  
 2️⃣ Listar animais  
@@ -16,12 +16,12 @@ Escolha uma opção enviando APENAS o número:
 
 ℹ️ Dica: digite *menu* a qualquer momento.
 `;
-    return sendMessage(phone, texto);
+    return await sendMessage(phone, texto);
 }
 
 export async function processarOpcaoMenu(phone, opcao) {
     switch (opcao) {
-        case "1":
+        case "1": 
             return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
 
         case "2":
@@ -43,6 +43,6 @@ export async function processarOpcaoMenu(phone, opcao) {
             return "🤖 Modo GPT ativado! Envie sua pergunta.";
 
         default:
-            return "❌ Opção inválida. Digite apenas números de 0 a 9.";
+            return "❌ Opção inválida. Digite um número entre 0 e 9.";
     }
 }
