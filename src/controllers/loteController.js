@@ -1,13 +1,19 @@
-import supabase from "../database/supabase.js";
 import { sendMessage } from "../services/whatsapp.js";
+import {
+    createLoteDB,
+    listLotesDB,
+    addAnimalToLoteDB,
+    removeAnimalFromLoteDB,
+    deleteLoteDB
+} from "../database/database.js";
+
+import supabase from "../database/supabase.js"; // usado apenas para consultas diretas
+import { logError } from "../utils/logger.js";
+
 
 // ======================================================
-// MÓDULO DE LOTES — COMPLETO E FUNCIONAL
+// 📦 Criar Lote
 // ======================================================
-
-// ------------------------------------------------------
-// 1. Criar Lote
-// ------------------------------------------------------
 export async function criarLote(phone, nomeLote) {
     try {
         if (!nomeLote || nomeLote.length < 2) {
@@ -26,67 +32,56 @@ export async function criarLote(phone, nomeLote) {
             return sendMessage(phone, `⚠️ O lote *${nomeLote}* já existe.`);
         }
 
-        const { error } = await supabase
-            .from("lotes")
-            .insert([
-                {
-                    phone,
-                    nome: nomeLote,
-                    criado_em: new Date().toISOString()
-                }
-            ]);
-
-        if (error) throw error;
+        // Cria via database.js
+        await createLoteDB(phone, nomeLote);
 
         return sendMessage(phone, `📦 Lote *${nomeLote}* criado com sucesso!`);
 
     } catch (err) {
-        console.error("Erro ao criar lote:", err);
+        logError(err, { section: "criarLote", phone });
         return sendMessage(phone, "❌ Erro ao criar lote. Tente novamente.");
     }
 }
 
-// ------------------------------------------------------
-// 2. Listar Lotes
-// ------------------------------------------------------
+
+
+// ======================================================
+// 📋 Listar lotes
+// ======================================================
 export async function listarLotes(phone) {
     try {
-        const { data, error } = await supabase
-            .from("lotes")
-            .select("*")
-            .eq("phone", phone)
-            .order("id", { ascending: true });
+        const lotes = await listLotesDB(phone);
 
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
+        if (lotes.length === 0) {
             return sendMessage(phone, "📭 Você ainda não tem lotes cadastrados.");
         }
 
         let texto = "📦 *SEUS LOTES:*\n\n";
 
-        data.forEach(lote => {
+        lotes.forEach(lote => {
             texto += `• ID: ${lote.id}\n  Nome: ${lote.nome}\n-----------------------\n`;
         });
 
         return sendMessage(phone, texto);
 
     } catch (err) {
-        console.error("Erro ao listar lotes:", err);
+        logError(err, { section: "listarLotes", phone });
         return sendMessage(phone, "❌ Erro ao listar os lotes.");
     }
 }
 
-// ------------------------------------------------------
-// 3. Adicionar Animal ao Lote
-// ------------------------------------------------------
+
+
+// ======================================================
+// 🐮 Adicionar Animal ao Lote
+// ======================================================
 export async function adicionarAoLote(phone, nomeLote, animalId) {
     try {
         if (!nomeLote || !animalId) {
             return sendMessage(phone, "⚠️ Use: adicionar ao lote nome_do_lote id_do_animal");
         }
 
-        // Verifica se lote existe
+        // Busca lote
         const { data: lote } = await supabase
             .from("lotes")
             .select("*")
@@ -98,7 +93,7 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
             return sendMessage(phone, `❌ Lote *${nomeLote}* não encontrado.`);
         }
 
-        // Verifica se animal existe
+        // Busca animal
         const { data: animal } = await supabase
             .from("animals")
             .select("*")
@@ -110,7 +105,7 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
             return sendMessage(phone, `❌ Animal com ID *${animalId}* não encontrado.`);
         }
 
-        // Verifica se já está no lote
+        // Verifica duplicidade
         const { data: existe } = await supabase
             .from("lote_animais")
             .select("*")
@@ -122,18 +117,8 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
             return sendMessage(phone, `⚠️ O animal já está no lote *${nomeLote}*.`);
         }
 
-        // Insere no lote
-        const { error } = await supabase
-            .from("lote_animais")
-            .insert([
-                {
-                    phone,
-                    lote_id: lote.id,
-                    animal_id: animalId
-                }
-            ]);
-
-        if (error) throw error;
+        // Adiciona via database.js
+        await addAnimalToLoteDB(phone, lote.id, animalId);
 
         return sendMessage(
             phone,
@@ -141,21 +126,23 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
         );
 
     } catch (err) {
-        console.error("Erro ao adicionar animal ao lote:", err);
+        logError(err, { section: "adicionarAoLote", phone });
         return sendMessage(phone, "❌ Erro ao adicionar animal ao lote.");
     }
 }
 
-// ------------------------------------------------------
-// 4. Remover Animal do Lote
-// ------------------------------------------------------
+
+
+// ======================================================
+// ❌ Remover Animal do Lote
+// ======================================================
 export async function removerDoLote(phone, nomeLote, animalId) {
     try {
         if (!nomeLote || !animalId) {
             return sendMessage(phone, "⚠️ Use: remover do lote nome_do_lote id_do_animal");
         }
 
-        // Verifica lote
+        // Busca lote
         const { data: lote } = await supabase
             .from("lotes")
             .select("*")
@@ -167,14 +154,8 @@ export async function removerDoLote(phone, nomeLote, animalId) {
             return sendMessage(phone, `❌ Lote *${nomeLote}* não encontrado.`);
         }
 
-        // Remove relação
-        const { error } = await supabase
-            .from("lote_animais")
-            .delete()
-            .eq("lote_id", lote.id)
-            .eq("animal_id", animalId);
-
-        if (error) throw error;
+        // Remove relação via database.js
+        await removeAnimalFromLoteDB(phone, lote.id, animalId);
 
         return sendMessage(
             phone,
@@ -182,14 +163,16 @@ export async function removerDoLote(phone, nomeLote, animalId) {
         );
 
     } catch (err) {
-        console.error("Erro ao remover animal do lote:", err);
+        logError(err, { section: "removerDoLote", phone });
         return sendMessage(phone, "❌ Erro ao remover animal do lote.");
     }
 }
 
-// ------------------------------------------------------
-// 5. Deletar Lote
-// ------------------------------------------------------
+
+
+// ======================================================
+// 🗑️ Deletar Lote
+// ======================================================
 export async function deletarLote(phone, nomeLote) {
     try {
         if (!nomeLote) {
@@ -208,24 +191,13 @@ export async function deletarLote(phone, nomeLote) {
             return sendMessage(phone, `❌ Lote *${nomeLote}* não encontrado.`);
         }
 
-        // Apaga animais do lote
-        await supabase
-            .from("lote_animais")
-            .delete()
-            .eq("lote_id", lote.id);
-
-        // Apaga lote
-        const { error } = await supabase
-            .from("lotes")
-            .delete()
-            .eq("id", lote.id);
-
-        if (error) throw error;
+        // Remove via database.js
+        await deleteLoteDB(phone, lote.id);
 
         return sendMessage(phone, `🗑️ Lote *${nomeLote}* deletado com sucesso.`);
 
     } catch (err) {
-        console.error("Erro ao deletar lote:", err);
+        logError(err, { section: "deletarLote", phone });
         return sendMessage(phone, "❌ Erro ao deletar lote.");
     }
 }

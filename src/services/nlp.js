@@ -29,7 +29,18 @@ import { respostaGPT } from "./gpt.js";
 import { sendMessage } from "../services/whatsapp.js";
 
 import { logInfo, logError } from "../utils/logger.js";
+import { getUser, updateUser } from "../database/database.js";
 
+// -------------------------------------------
+// FUNÇÃO AUXILIAR — Saudação por horário
+// -------------------------------------------
+function saudacaoPorHorario() {
+    const hora = new Date().getHours();
+
+    if (hora >= 5 && hora < 12) return "Bom dia";
+    if (hora >= 12 && hora < 18) return "Boa tarde";
+    return "Boa noite";
+}
 export async function processarMensagem(phone, msg) {
 
     logInfo("📩 Mensagem recebida", { phone, msg });
@@ -43,7 +54,50 @@ export async function processarMensagem(phone, msg) {
         if (/(menu|ajuda|help)/.test(texto)) {
             return await mostrarMenu(phone);
         }
+        // -------------------------------------------------------------------
+        // SAUDAÇÕES INTELIGENTES + NOME + ÚLTIMA AÇÃO
+        // -------------------------------------------------------------------
+            const saudacoesSimples = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
+        if (saudacoesSimples.includes(texto)) {
 
+            const user = await getUser(phone);
+
+            const nome = user?.name || "";
+            const ultimaAcao = user?.data?.ultima_acao || null;
+
+            const saudacao = saudacaoPorHorario();
+            const saudacaoNome = nome ? `${saudacao}, ${nome}!` : `${saudacao}!`;
+
+        if (ultimaAcao) {
+            return await sendMessage(phone, 
+            `${saudacaoNome}
+
+        Você deseja continuar de onde parou?
+        ➡ Última ação pendente: *${ultimaAcao}*
+
+        Ou escolha uma opção:
+
+        1️⃣ Animais 
+        2️⃣ Lotes  
+        3️⃣ Cálculos  
+        4️⃣ Diagnóstico   
+        5️⃣ Falar com o GPT 🤖  
+        `);
+        }
+
+            return await sendMessage(phone,
+            `${saudacaoNome} Como posso ajudar hoje?
+
+        Aqui está o menu:
+
+         1️⃣ Animais  
+         2️⃣ Lotes  
+         3️⃣ Cálculos  
+         4️⃣ Diagnóstico  
+         5️⃣ Falar com o GPT 🤖  
+
+         Digite o número da opção desejada.`);
+        }
 
         // -------------------------------------------------------------------
         // 1 — MENU PRINCIPAL → OPÇÕES GRANDES (1–5)
