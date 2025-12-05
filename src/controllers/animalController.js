@@ -108,43 +108,60 @@ Notas: ${a.notas || "—"}
 // =======================================================
 export async function editarAnimal(phone, msg) {
     try {
-        const partes = msg.split(" ");
+        // Quebrar em linhas
+        const linhas = msg.split("\n").map(l => l.trim()).filter(l => l);
 
-        // editar animal ID campo valor...
-        // ex: editar animal 5 peso 410
+        if (linhas.length < 2) {
+            return sendMessage(phone, "⚠️ Formato inválido!\n\nUse:\neditar animal ID\nNome\nRaça\nPeso\nIdade\nNotas");
+        }
 
-        const id = Number(partes[2]);
-        const campo = partes[3];
-        const valor = partes.slice(4).join(" ");
+        // Linha 1: "editar animal 4"
+        const primeiraLinha = linhas[0].split(" ");
+        const id = Number(primeiraLinha[2]);
 
         if (!id || isNaN(id)) {
             return sendMessage(phone, "❌ ID inválido.");
         }
 
-        const camposPermitidos = ["nome", "raca", "peso", "idade", "notas"];
+        // Coleta multilinhas
+        const nome = linhas[1] || null;
+        const raca = linhas[2] || null;
+        const peso = linhas[3] ? linhas[3].replace(/[^0-9]/g, "") : null;
+        const idade = linhas[4] || null;
+        const notas = linhas.slice(5).join(" ");
 
-        if (!camposPermitidos.includes(campo)) {
-            return sendMessage(phone, "❌ Campo inválido! Use: nome, raca, peso, idade, notas.");
+        // Criar objeto apenas com valores preenchidos
+        const camposAtualizar = {};
+
+        if (nome) camposAtualizar.nome = nome;
+        if (raca) camposAtualizar.raca = raca;
+        if (peso) camposAtualizar.peso = Number(peso);
+        if (idade) camposAtualizar.idade = idade;
+        if (notas) camposAtualizar.notas = notas;
+
+        if (Object.keys(camposAtualizar).length === 0) {
+            return sendMessage(phone, "⚠️ Nenhuma informação para atualizar.");
         }
 
-        const valorFinal = campo === "peso" ? Number(valor) : valor;
-
+        // Atualizar no Supabase
         const { error } = await supabase
             .from("animals")
-            .update({ [campo]: valorFinal })
+            .update(camposAtualizar)
             .eq("id", id)
             .eq("phone", phone);
 
         if (error) throw error;
 
-        return sendMessage(phone, `✅ *Animal ${id} atualizado com sucesso!*`);
+        return sendMessage(
+            phone,
+            `✅ Animal *${id}* atualizado com sucesso!\n\nCampos modificados:\n${JSON.stringify(camposAtualizar, null, 2)}`
+        );
 
     } catch (err) {
         console.error("Erro ao editar animal:", err);
-        return sendMessage(phone, "❌ Erro ao editar animal.");
+        return sendMessage(phone, "❌ Erro ao editar animal. Revise os dados enviados.");
     }
 }
-
 
 // =======================================================
 // ❌ Remover Animal

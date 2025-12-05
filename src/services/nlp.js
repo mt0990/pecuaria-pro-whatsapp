@@ -73,7 +73,6 @@ export async function processarMensagem(phone, msg) {
             return resposta;
         }
 
-
         // -------------------------------------------------------------------
         // 3 — COMANDOS DIRETOS
         // -------------------------------------------------------------------
@@ -83,9 +82,9 @@ export async function processarMensagem(phone, msg) {
             return registrarAnimal(phone, msg);
         }
 
-        // 🔹 Editar animal
+        // EDITAR ANIMAL (MULTILINHAS)
         if (texto.startsWith("editar animal")) {
-            return editarAnimal(phone, msg);
+            return await editarAnimal(phone, msg);
         }
 
         // 🔹 Remover animal
