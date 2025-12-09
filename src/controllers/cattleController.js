@@ -70,7 +70,7 @@ export async function custoPorArroba(phone, msg) {
     }
 
     // Cálculo
-    const arrobas = peso / 15;
+    const arrobas = peso / 30;
     const custo = valor / arrobas;
 
     return sendMessage(

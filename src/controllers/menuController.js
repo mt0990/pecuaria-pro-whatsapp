@@ -62,6 +62,7 @@ export async function mostrarMenuCalculos(phone) {
 3.2 🐂 Custo por arroba  
 3.3 🌱 UA (Unidade Animal)  
 3.4 🌾 Lotação UA/ha  
+3.5 🧪 Dieta PRO (MS, PB, NDT, ajuste)
 
 ⬅️ Digite *menu* para voltar.
 `;
@@ -165,6 +166,13 @@ export async function processarOpcaoMenu(phone, opcao) {
         case "3.4":
             return "📌 Envie: lotacao area_ha numero_animais";
 
+        case "3.5":
+    return "📘 *Dieta PRO – Envie a dieta no formato:*\n\n" +
+           "dieta 391 kg\n" +
+           "milho 60kg\n" +
+           "soja 30kg\n" +
+           "casca 50kg\n" +
+           "nucleo 10kg";
 
         // ==========================
         // SUBMENU — DIAGNÓSTICO
