@@ -15,15 +15,23 @@ logInfo("🔄 Iniciando Pecuária Pro WhatsApp Bot...");
 const app = express();
 
 // =============================================
-// 🧩 MIDDLEWARES PRINCIPAIS
+// 🧩 MIDDLEWARES
 // =============================================
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
-// (opcional) ativar morgan somente em ambiente de desenvolvimento
-if (process.env.NODE_ENV === "development") {
+// habilita logs somente em desenvolvimento
+if (config.NODE_ENV === "development") {
     app.use(morgan("dev"));
 }
+
+// segurança para evitar requisições ultramsg sem body
+app.use((req, res, next) => {
+    if (req.method === "POST" && !req.body) {
+        logError("❗ Webhook POST recebido sem body", { path: req.path });
+    }
+    next();
+});
 
 // =============================================
 // 📩 ROTAS DO WHATSAPP
@@ -39,13 +47,14 @@ app.use(errorHandler);
 // 🚀 INICIAR SERVIDOR
 // =============================================
 app.listen(config.PORT, () => {
-    logInfo(`🔥 Servidor rodando na porta ${config.PORT}`, {
-        url: `http://localhost:${config.PORT}`
-    });
+    logInfo(
+        `🔥 Servidor rodando na porta ${config.PORT} — Modo: ${config.NODE_ENV || "production"}`,
+        { url: `http://localhost:${config.PORT}` }
+    );
 });
 
 // =============================================
-// 🛑 CAPTURAR ERROS GLOBAIS
+// 🛑 CAPTURA DE ERROS NÃO TRATADOS
 // =============================================
 process.on("unhandledRejection", (reason) => {
     logError(reason, { type: "unhandledRejection" });

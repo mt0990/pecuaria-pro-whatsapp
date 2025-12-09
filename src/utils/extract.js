@@ -1,35 +1,38 @@
 // =============================================
-// 🔍 FUNÇÕES DE EXTRAÇÃO — NLP CONTROLADO
+// 🔍 FUNÇÕES DE EXTRAÇÃO — VERSÃO INTELIGENTE
 // =============================================
 
-export function extrairNumero(msg) {
-    const match = msg.match(/\d+(\.\d+)?/);
-    return match ? Number(match[0]) : null;
+// extrai TODOS os números da mensagem (com vírgula ou ponto)
+export function extrairTodosNumeros(msg) {
+    if (!msg) return [];
+    const encontrados = msg.match(/\d+[.,]?\d*/g);
+    if (!encontrados) return [];
+
+    return encontrados.map(n =>
+        Number(n.replace(/\./g, "").replace(",", "."))
+    );
 }
 
+// extrai o primeiro número da frase (peso normalmente)
 export function extrairPesoDaMensagem(msg) {
-    const match = msg.match(/(\d+)\s?kg/i);
-    if (match) return Number(match[1]);
-
-    const numero = extrairNumero(msg);
-    return numero || null;
+    const nums = extrairTodosNumeros(msg);
+    return nums.length >= 1 ? nums[0] : null;
 }
 
-export function extrairAreaHa(msg) {
-    const match = msg.match(/(\d+(\.\d+)?)\s?ha/i);
-    if (match) return Number(match[1]);
-
-    const numero = extrairNumero(msg);
-    return numero || null;
-}
-
+// extrai o segundo número (valor total normalmente)
 export function extrairCustoDaMensagem(msg) {
-    const match = msg.match(/(\d+(\,\d+)?)/);
-    if (!match) return null;
-
-    return Number(match[1].replace(",", "."));
+    const nums = extrairTodosNumeros(msg);
+    return nums.length >= 2 ? nums[1] : null;
 }
 
+// extrai quantidade quando necessário
 export function extrairQuantidadeDaMensagem(msg) {
-    return extrairNumero(msg);
+    const nums = extrairTodosNumeros(msg);
+    return nums.length >= 1 ? nums[0] : null;
+}
+
+// extrai área em hectares
+export function extrairAreaHa(msg) {
+    const nums = extrairTodosNumeros(msg);
+    return nums.length >= 1 ? nums[0] : null;
 }
