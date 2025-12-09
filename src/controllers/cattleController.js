@@ -49,14 +49,32 @@ export async function calcularLotacao(phone, msg) {
 }
 
 export async function custoPorArroba(phone, msg) {
-    const custo = extrairCustoDaMensagem(msg);
-    const peso = extrairPesoDaMensagem(msg);
 
-    if (!custo || !peso)
-        return sendMessage(phone, "❌ Envie: custo total + peso do animal.");
+    // Extrair números da mensagem
+    const regexNumeros = msg.match(/\d+([\.,]\d+)?/g);
 
+    if (!regexNumeros || regexNumeros.length < 2) {
+        return sendMessage(phone,
+            "📌 Envie: custo por arroba PESO_KG VALOR_TOTAL\n\nEx: custo por arroba 373 kg 2200 reais"
+        );
+    }
+
+    // Converter para número
+    let peso = Number(regexNumeros[0].replace(",", "."));
+    let valor = Number(regexNumeros[1].replace(",", "."));
+
+    if (peso <= 0 || valor <= 0) {
+        return sendMessage(phone,
+            "⚠️ Peso ou valor inválido. Envie assim:\n👉 *custo por arroba 373 kg 2200 reais*"
+        );
+    }
+
+    // Cálculo
     const arrobas = peso / 15;
-    const preco = custo / arrobas;
+    const custo = valor / arrobas;
 
-    return sendMessage(phone, `💰 Custo por arroba: R$ ${preco.toFixed(2)}`);
+    return sendMessage(
+        phone,
+        `💰 *Custo por arroba:* R$ ${custo.toFixed(2)}\n\n📏 Peso: ${peso} kg\n💵 Valor total: R$ ${valor}`
+    );
 }
