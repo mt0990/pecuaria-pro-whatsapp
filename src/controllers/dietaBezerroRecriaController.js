@@ -10,8 +10,6 @@ import {
     formatarDietaRecria
 } from "../services/dietaRecriaCalculator.js";
 
-import { sendMessage } from "../services/whatsapp.js";
-
 export async function dietaBezerroRecriaController(phone, msg) {
     const texto = msg.toLowerCase();
 
@@ -20,10 +18,10 @@ export async function dietaBezerroRecriaController(phone, msg) {
         const peso = extrairPesoBezerro(msg);
         
         if (!peso)
-            return sendMessage(phone, "⚠️ Envie: dieta bezerro 120 kg");
+            return "⚠️ Envie: dieta bezerro 120 kg";
         
         const r = calcularDietaBezerro(peso);
-        return sendMessage(phone, formatarDietaBezerro(r));
+        return formatarDietaBezerro(r);
     }
 
     // ----- Detectar recria -----
@@ -31,11 +29,11 @@ export async function dietaBezerroRecriaController(phone, msg) {
         const peso = extrairPesoRecria(msg);
 
         if (!peso)
-            return sendMessage(phone, "⚠️ Envie: dieta recria 220 kg");
+            return "⚠️ Envie: dieta recria 220 kg";
 
         const r = calcularDietaRecria(peso);
-        return sendMessage(phone, formatarDietaRecria(r));
+        return formatarDietaRecria(r);
     }
 
-    return null; // deixa o NLP tentar outra lógica
+    return null;
 }

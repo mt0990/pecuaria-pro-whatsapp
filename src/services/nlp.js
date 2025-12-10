@@ -1,5 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Corrigida)
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Final Corrigida)
 // =============================================
 
 import {
@@ -28,6 +28,7 @@ import {
 } from "../controllers/loteController.js";
 
 import { calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
+
 import { diagnosticoAnimal } from "../controllers/diagnosticoController.js";
 import { respostaGPT } from "./gpt.js";
 
@@ -153,65 +154,75 @@ export async function processarMensagem(phone, msg) {
 
     try {
 
-        // MENU — sempre disponível
-        if (/(menu|ajuda|help)/.test(texto)) return await mostrarMenu(phone);
+        // MENU — SEMPRE DISPONÍVEL
+        if (/(menu|ajuda|help)/.test(texto)) {
+            await mostrarMenu(phone);
+            return null;
+        }
 
-        // Saudações → abre menu
+        // SAUDAÇÕES → MENU
         const saudacoes = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
-        if (saudacoes.includes(texto)) return await mostrarMenu(phone);
+        if (saudacoes.includes(texto)) {
+            await mostrarMenu(phone);
+            return null;
+        }
 
-        // Números do menu
+        // MENU PRINCIPAL (NÚMEROS)
         if (/^\d$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
 
-            if (r?.submenu === "animais") return await mostrarMenuAnimais(phone);
-            if (r?.submenu === "lotes") return await mostrarMenuLotes(phone);
-            if (r?.submenu === "calculos") return await mostrarMenuCalculos(phone);
-            if (r?.submenu === "diagnostico") return await mostrarMenuDiagnostico(phone);
-            if (r?.submenu === "gpt") return await mostrarMenuGPT(phone);
+            if (r?.submenu === "animais") { await mostrarMenuAnimais(phone); return null; }
+            if (r?.submenu === "lotes") { await mostrarMenuLotes(phone); return null; }
+            if (r?.submenu === "calculos") { await mostrarMenuCalculos(phone); return null; }
+            if (r?.submenu === "diagnostico") { await mostrarMenuDiagnostico(phone); return null; }
+            if (r?.submenu === "gpt") { await mostrarMenuGPT(phone); return null; }
 
-            return r;
+            return r; // Pode retornar instruções de submenu
         }
 
-        // 1.1 / 3.5 etc.
+        // SUBMENUS (1.1 / 3.5 etc.)
         if (/^\d+\.\d+$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
 
-            if (r?.acao === "listar_animais") return await listarAnimais(phone);
-            if (r?.acao === "listar_lotes") return await listarLotes(phone);
+            if (r?.acao === "listar_animais") { await listarAnimais(phone); return null; }
+            if (r?.acao === "listar_lotes") { await listarLotes(phone); return null; }
 
             return r;
         }
 
-        // CRUD
-        if (texto.startsWith("registrar animal")) return await registrarAnimal(phone, msg);
-        if (texto.startsWith("editar animal")) return await editarAnimal(phone, msg);
-        if (texto.startsWith("remover animal")) return await removerAnimal(phone, msg);
-        if (texto === "listar animais") return await listarAnimais(phone);
+        // CRUD ANIMAIS & LOTES
+        if (texto.startsWith("registrar animal")) { await registrarAnimal(phone, msg); return null; }
+        if (texto.startsWith("editar animal")) { await editarAnimal(phone, msg); return null; }
+        if (texto.startsWith("remover animal")) { await removerAnimal(phone, msg); return null; }
+        if (texto === "listar animais") { await listarAnimais(phone); return null; }
 
         if (texto.startsWith("criar lote")) {
             const nome = texto.replace("criar lote", "").trim();
-            return await criarLote(phone, nome);
+            await criarLote(phone, nome);
+            return null;
         }
 
-        if (texto === "listar lotes") return await listarLotes(phone);
+        if (texto === "listar lotes") { await listarLotes(phone); return null; }
 
         if (texto.startsWith("adicionar ao lote")) {
             const p = texto.split(" ");
-            return await adicionarAoLote(phone, p[3], p[4]);
+            await adicionarAoLote(phone, p[3], p[4]);
+            return null;
         }
 
         if (texto.startsWith("remover do lote")) {
             const p = texto.split(" ");
-            return await removerDoLote(phone, p[3], p[4]);
+            await removerDoLote(phone, p[3], p[4]);
+            return null;
         }
 
         if (texto.startsWith("remover lote")) {
             const nome = texto.replace("remover lote", "").trim();
-            return await deletarLote(phone, nome);
+            await deletarLote(phone, nome);
+            return null;
         }
 
-        // DIETAS
+        // DIETAS (que RETORNAM TEXTO apenas)
         if (texto.includes("dieta") && texto.includes("leite")) {
             return await dietaLeiteiraController(phone, msg);
         }
@@ -223,12 +234,12 @@ export async function processarMensagem(phone, msg) {
             return await dietaProfissionalController(phone, msg);
         }
 
-        // Cálculos
+        // CÁLCULOS (RETORNAM TEXTO)
         if (texto.startsWith("ua")) return await calcularUA(phone, msg);
         if (texto.includes("lotacao")) return await calcularLotacao(phone, msg);
         if (texto.includes("arroba")) return await custoPorArroba(phone, msg);
 
-        // DIETA SALVA
+        // RESPOSTAS BASEADAS EM DIETA SALVA
         const user = await getUser(phone);
 
         const r1 = await tentarResponderDietaCorte(user, texto);
@@ -251,7 +262,7 @@ export async function processarMensagem(phone, msg) {
             return await diagnosticoAnimal(phone, msg);
         }
 
-        // GPT
+        // GPT (retorna texto)
         return await respostaGPT(phone, msg);
 
     } catch (err) {

@@ -3,7 +3,6 @@ dotenv.config();
 
 import OpenAI from "openai";
 import { logError, logInfo } from "../utils/logger.js";
-import { sendMessage } from "./whatsapp.js";
 
 import {
     getConversationHistory,
@@ -15,50 +14,45 @@ const openai = new OpenAI({
 });
 
 // ==================================================
-// 🧠 GPT PREMIUM — Com memória otimizada
+// 🧠 GPT PREMIUM — Com memória otimizada (SEM DUPLICAR MENSAGEM)
 // ==================================================
 export async function respostaGPT(phone, mensagem) {
     try {
         logInfo("➡️ Preparando GPT com memória otimizada", { phone });
 
-        // 1️⃣ Buscar histórico completo
+        // 1️⃣ Buscar histórico
         let history = await getConversationHistory(phone);
 
-        // 2️⃣ Limitar ao histórico mais recente (20 interações)
+        // 2️⃣ Limitar ao mais recente
         if (history.length > 20) {
             history = history.slice(history.length - 20);
         }
 
-        // 3️⃣ Comprimir histórico longo (reduz custo)
+        // 3️⃣ Resumo opcional
         const resumoHistorico = gerarResumoSeNecessario(history);
 
-        // 4️⃣ Montar prompt final
+        // 4️⃣ Prompt do ChatGPT
         const messages = [
             {
                 role: "system",
                 content:
                     "Você é o assistente oficial Pecuária Pro. " +
-                    "Seu objetivo é ajudar criadores com respostas claras, práticas " +
-                    "e objetivas sobre pecuária, dietas, manejo, reprodução, saúde e gestão. " +
-                    "Nunca responda de forma genérica ou vaga."
+                    "Responda com clareza, objetividade e linguagem de campo."
             },
 
-            // Resumo comprimido (se existir)
             ...(resumoHistorico
                 ? [{ role: "system", content: `Resumo da conversa anterior: ${resumoHistorico}` }]
                 : []),
 
-            // Histórico original
             ...history.map(h => ({
                 role: h.role,
                 content: h.message
             })),
 
-            // Pergunta atual
             { role: "user", content: mensagem }
         ];
 
-        // 5️⃣ Chamar modelo com suporte a histórico
+        // 5️⃣ Chamada GPT
         const completion = await openai.chat.completions.create({
             model: "gpt-4.1-mini",
             messages,
@@ -66,16 +60,12 @@ export async function respostaGPT(phone, mensagem) {
         });
 
         const resposta = completion.choices[0].message.content;
-
-        // Segurança: evita resposta vazia
         const respostaFinal = resposta?.trim() || "Não consegui entender a pergunta.";
 
-        // 6️⃣ Salvar resposta no histórico
+        // 6️⃣ Salvar histórico
         await addConversation(phone, "assistant", respostaFinal);
 
-        // 7️⃣ Enviar ao WhatsApp
-        await sendMessage(phone, respostaFinal);
-
+        // 7️⃣ IMPORTANTE: NÃO enviar aqui — apenas retornar
         return respostaFinal;
 
     } catch (err) {
@@ -85,17 +75,12 @@ export async function respostaGPT(phone, mensagem) {
             mensagem
         });
 
-        await sendMessage(
-            phone,
-            "⚠️ A IA encontrou um erro. Tente novamente em instantes."
-        );
-
-        return null;
+        return "⚠️ A IA encontrou um erro. Tente novamente em instantes.";
     }
 }
 
 // ==================================================
-// 🔧 Função que comprime histórico para reduzir custo
+// 🔧 Redução de histórico
 // ==================================================
 function gerarResumoSeNecessario(history) {
     if (history.length < 10) return null;
