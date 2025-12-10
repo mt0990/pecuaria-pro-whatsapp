@@ -266,12 +266,23 @@ export async function processarMensagem(phone, msg) {
         if (respostaBR) return sendMessage(phone, respostaBR);
 
         // =================================================
-        // 9) DIAGNÓSTICO AUTOMÁTICO
+        // 9) DIAGNÓSTICO AUTOMÁTICO (somente com sintomas reais)
         // =================================================
-        if (msg.length > 35 && !texto.includes("gpt")) {
-            return diagnosticoAnimal(phone, msg);
-        }
+        const gatilhosDiagnostico = [
+        "febre", "febril", "doente", "diarreia", "diarréia",
+        "tossindo", "tosse", "lesão", "ferida", "manco", "mancando",
+        "triste", "abatido", "apático", "sem comer", "não come",
+        "magro", "emagrecendo", "isolado", "respiração", "chiado",
+        "inchaço", "inchado", "babando", "muco", "nariz", "olhos"
+        ];
 
+        const temSintoma = gatilhosDiagnostico.some(s => texto.includes(s));
+
+        // Se tiver palavras de sintomas → diagnóstico
+        if (temSintoma) {
+        return diagnosticoAnimal(phone, msg);
+        }
+        
         // =================================================
         // 10) GPT — Fallback final
         // =================================================
