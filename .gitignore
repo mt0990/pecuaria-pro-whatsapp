@@ -1,5 +1,12 @@
-# Ignorar arquivos privados
+# Arquivos privados
 .env
-database.sqlite
-node_modules/
+.env.local
+.env.*.local
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+
+# Node
+node_modules/
