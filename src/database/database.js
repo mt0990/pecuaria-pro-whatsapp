@@ -1,11 +1,10 @@
 // ==============================================================
 // 📦 BANCO DE DADOS — Supabase (PT-BR)
-// Versão unificada, estável e 100% compatível com o projeto atual
+// Versão final corrigida
 // ==============================================================
 
 import supabase from "./supabase.js";
 import { logError } from "../utils/logger.js";
-
 
 // ==============================================================
 // 1️⃣ USERS
@@ -19,10 +18,7 @@ export async function getUser(phone) {
             .eq("phone", phone)
             .single();
 
-        if (error) return null;
-
-        return data || null;
-
+        return error ? null : data;
     } catch (err) {
         logError(err, { section: "getUser", phone });
         return null;
@@ -44,17 +40,14 @@ export async function createUser(phone, name = null) {
 
 export async function updateUser(phone, fields) {
     try {
-        // Pega usuario atual
         const { data: user } = await supabase
             .from("users")
             .select("data")
             .eq("phone", phone)
             .single();
 
-        const novoData = {
-            ...(user?.data || {}),
-            ...(fields.data || {})
-        };
+        const dataAtual = user?.data || {};
+        const novoData = { ...dataAtual, ...(fields.data || {}) };
 
         const enviar = {
             ...fields,
@@ -72,7 +65,7 @@ export async function updateUser(phone, fields) {
 }
 
 // ==============================================================
-// 2️⃣ CONVERSATIONS
+// 2️⃣ CONVERSATIONS (corrigido! usa created_at corretamente)
 // ==============================================================
 
 export async function addConversation(phone, role, message) {
@@ -81,8 +74,8 @@ export async function addConversation(phone, role, message) {
             {
                 phone,
                 role,
-                message,
-                timestamp: new Date().toISOString()
+                message
+                // created_at é automático
             }
         ]);
     } catch (err) {
@@ -92,16 +85,14 @@ export async function addConversation(phone, role, message) {
 
 export async function getConversationHistory(phone, limit = 15) {
     try {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from("conversations")
             .select("role, message")
             .eq("phone", phone)
             .order("id", { ascending: false })
             .limit(limit);
 
-        if (error) return [];
-
-        return data.reverse();
+        return data?.reverse() || [];
 
     } catch (err) {
         logError(err, { section: "getConversationHistory", phone });
@@ -109,9 +100,8 @@ export async function getConversationHistory(phone, limit = 15) {
     }
 }
 
-
 // ==============================================================
-// 3️⃣ DIAGNOSTICS — (usado no diagnóstico veterinário)
+// 3️⃣ DIAGNOSTICS
 // ==============================================================
 
 export async function saveDiagnostic(phone, category, payload) {
@@ -120,8 +110,8 @@ export async function saveDiagnostic(phone, category, payload) {
             {
                 phone,
                 category,
-                data: JSON.stringify(payload),
-                created_at: new Date().toISOString()
+                data: JSON.stringify(payload)
+                // created_at automático
             }
         ]);
     } catch (err) {
@@ -131,13 +121,11 @@ export async function saveDiagnostic(phone, category, payload) {
 
 export async function getDiagnostics(phone) {
     try {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from("diagnostics")
             .select("*")
             .eq("phone", phone)
             .order("id", { ascending: false });
-
-        if (error) return [];
 
         return data || [];
 
@@ -147,50 +135,32 @@ export async function getDiagnostics(phone) {
     }
 }
 
-
 // ==============================================================
-// 4️⃣ ANIMALS — COMPLETAMENTE COMPATÍVEL COM SEU animalController.js
+// 4️⃣ ANIMALS
 // ==============================================================
 
-export async function salvarAnimalDB({
-    phone,
-    nome,
-    raca,
-    peso,
-    idade,
-    notas
-}) {
+export async function salvarAnimalDB(obj) {
     try {
-        const { error } = await supabase.from("animals").insert([
+        await supabase.from("animals").insert([
             {
-                phone,
-                nome,
-                raca,
-                peso,
-                idade,
-                notas,
+                ...obj,
                 created_at: new Date().toISOString()
             }
         ]);
-
-        if (error) throw error;
-
     } catch (err) {
-        logError(err, { section: "salvarAnimalDB", phone });
+        logError(err, { section: "salvarAnimalDB" });
     }
 }
 
 export async function getAnimalsByUser(phone) {
     try {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from("animals")
             .select("*")
             .eq("phone", phone)
             .order("id", { ascending: true });
 
-        if (error) return [];
-
-        return data;
+        return data || [];
 
     } catch (err) {
         logError(err, { section: "getAnimalsByUser", phone });
@@ -200,71 +170,52 @@ export async function getAnimalsByUser(phone) {
 
 export async function updateAnimalDB(phone, id, updates) {
     try {
-        const { error } = await supabase
+        await supabase
             .from("animals")
             .update(updates)
             .eq("id", id)
             .eq("phone", phone);
 
-        if (error) throw error;
-
     } catch (err) {
-        logError(err, { section: "updateAnimalDB", phone, id });
+        logError(err, { section: "updateAnimalDB", id, phone });
     }
 }
 
 export async function deleteAnimalDB(phone, id) {
     try {
-        const { error } = await supabase
+        await supabase
             .from("animals")
             .delete()
             .eq("id", id)
             .eq("phone", phone);
 
-        if (error) throw error;
-
     } catch (err) {
-        logError(err, { section: "deleteAnimalDB", phone, id });
+        logError(err, { section: "deleteAnimalDB", id, phone });
     }
 }
 
-
 // ==============================================================
-// 5️⃣ LOTES — COMPATÍVEL COM SEU loteController.js ATUAL
+// 5️⃣ LOTES
 // ==============================================================
 
-// Criar lote
 export async function createLoteDB(phone, nome) {
     try {
-        const { error } = await supabase
+        await supabase
             .from("lotes")
-            .insert([
-                {
-                    phone,
-                    nome,
-                    criado_em: new Date().toISOString()
-                }
-            ]);
-
-        if (error) throw error;
-
+            .insert([{ phone, nome }]);
     } catch (err) {
         logError(err, { section: "createLoteDB", phone, nome });
     }
 }
 
-// Listar lotes
 export async function listLotesDB(phone) {
     try {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from("lotes")
             .select("*")
-            .eq("phone", phone)
-            .order("id", { ascending: true });
+            .eq("phone", phone);
 
-        if (error) return [];
-
-        return data;
+        return data || [];
 
     } catch (err) {
         logError(err, { section: "listLotesDB", phone });
@@ -272,56 +223,42 @@ export async function listLotesDB(phone) {
     }
 }
 
-// Adicionar animal ao lote
 export async function addAnimalToLoteDB(phone, lote_id, animal_id) {
     try {
-        const { error } = await supabase
-            .from("lote_animais")
-            .insert([
-                { phone, lote_id, animal_id }
-            ]);
-
-        if (error) throw error;
-
+        await supabase.from("lote_animais").insert([
+            { lote_id, animal_id }
+        ]);
     } catch (err) {
         logError(err, { section: "addAnimalToLoteDB", phone, lote_id });
     }
 }
 
-// Remover animal do lote
 export async function removeAnimalFromLoteDB(phone, lote_id, animal_id) {
     try {
-        const { error } = await supabase
+        await supabase
             .from("lote_animais")
             .delete()
             .eq("lote_id", lote_id)
             .eq("animal_id", animal_id);
 
-        if (error) throw error;
-
     } catch (err) {
-        logError(err, { section: "removeAnimalFromLoteDB", phone, lote_id });
+        logError(err, { section: "removeAnimalFromLoteDB", lote_id });
     }
 }
 
-// Deletar lote
 export async function deleteLoteDB(phone, lote_id) {
     try {
-        // Remove todos os animais do lote
         await supabase
             .from("lote_animais")
             .delete()
             .eq("lote_id", lote_id);
 
-        // Remove o lote
-        const { error } = await supabase
+        await supabase
             .from("lotes")
             .delete()
             .eq("id", lote_id);
 
-        if (error) throw error;
-
     } catch (err) {
-        logError(err, { section: "deleteLoteDB", phone, lote_id });
+        logError(err, { section: "deleteLoteDB", lote_id });
     }
 }
