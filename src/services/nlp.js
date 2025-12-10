@@ -1,5 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Otimizada Final)
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Final)
 // =============================================
 
 import {
@@ -35,7 +35,59 @@ import { sendMessage } from "../services/whatsapp.js";
 import { logInfo, logError } from "../utils/logger.js";
 
 import { dietaProfissionalController } from "../controllers/dietaController.js";
+import { dietaLeiteiraController } from "../controllers/dietaLeiteController.js";
+import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaController.js";
+
 import { getUser } from "../database/database.js";
+
+// NOVO — Assistente Nutricional
+import {
+    isPerguntaDieta,
+    processarPerguntaDieta
+} from "../services/dietAssistant.js";
+
+
+// =================================================
+// Função externa para responder perguntas simples (percentuais e dominante)
+// =================================================
+async function tentarResponderDieta(phone, texto) {
+    const user = await getUser(phone);
+    const dieta = user?.data?.ultima_dieta;
+
+    if (!dieta) return null;
+
+    // Percentuais
+    if (texto.includes("porcent") || texto.includes("percent")) {
+        if (!dieta.resultado?.detalhesPorIngrediente) return null;
+
+        const lista = dieta.resultado.detalhesPorIngrediente
+            .map(i => `• ${i.nome}: ${i.percentual.toFixed(1)}%`)
+            .join("\n");
+
+        return `📊 *Percentual de cada ingrediente:*\n${lista}`;
+    }
+
+    // Ingrediente dominante
+    if (
+        texto.includes("qual ingrediente mais") ||
+        texto.includes("predominante") ||
+        texto.includes("mais alto") ||
+        texto.includes("maior")
+    ) {
+        if (!dieta.resultado?.detalhesPorIngrediente) return null;
+
+        const ordenado = [...dieta.resultado.detalhesPorIngrediente]
+            .sort((a, b) => b.percentual - a.percentual);
+
+        const top = ordenado[0];
+
+        return `📈 *Ingrediente predominante:*  
+${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
+    }
+
+    return null;
+}
+
 
 
 // =================================================
@@ -49,7 +101,7 @@ export async function processarMensagem(phone, msg) {
 
     try {
         // =================================================
-        // 1) MENU PRINCIPAL EM QUALQUER MOMENTO
+        // 1) MENU PRINCIPAL
         // =================================================
         if (/(menu|ajuda|help)/.test(texto)) {
             return mostrarMenu(phone);
@@ -79,7 +131,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 4) SUBMENUS (1.1 / 1.2 / 2.3 etc)
+        // 4) SUBMENUS (1.1 / 2.3 etc)
         // =================================================
         if (/^\d+\.\d+$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
@@ -91,7 +143,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 5) COMANDOS DE TEXTO DIRETO
+        // 5) COMANDOS DIRETOS (texto)
         // =================================================
         if (texto.startsWith("registrar animal")) return registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return editarAnimal(phone, msg);
@@ -120,64 +172,65 @@ export async function processarMensagem(phone, msg) {
             return deletarLote(phone, nome);
         }
 
+
         // =================================================
-        // 6) CÁLCULOS RÁPIDOS + DIETA PRO AUTOMÁTICA
+        // 6) DIETAS (Ordem correta)
         // =================================================
+
+        if (texto.includes("dieta") && texto.includes("leite")) {
+            return dietaLeiteiraController(phone, msg);
+        }
+
+        if (texto.includes("dieta") && (texto.includes("bezerro") || texto.includes("recria"))) {
+            return dietaBezerroRecriaController(phone, msg);
+        }
+
         if (texto.includes("dieta")) {
             return dietaProfissionalController(phone, msg);
         }
 
-        if (texto.startsWith("ua")) {
-            return calcularUA(phone, msg);
-        }
-
-        if (texto.includes("lotacao")) {
-            return calcularLotacao(phone, msg);
-        }
-
-        if (texto.includes("arroba")) {
-            return custoPorArroba(phone, msg);
-        }
 
         // =================================================
-        // 7) DIAGNÓSTICO AUTOMÁTICO
+        // 7) CÁLCULOS RÁPIDOS
         // =================================================
-        if (msg.length > 25 && !texto.includes("gpt")) {
-            return diagnosticoAnimal(phone, msg);
-        }
+        if (texto.startsWith("ua")) return calcularUA(phone, msg);
+        if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
+        if (texto.includes("arroba")) return custoPorArroba(phone, msg);
 
-        // Detectar perguntas sobre dieta
-        async function tentarResponderDieta(phone, texto) {
-        const user = await getUser(phone);
-        const dieta = user?.data?.ultima_dieta;
-        if (!dieta) return null;
 
-        // PERGUNTAS COMUNS
-        if (texto.includes("porcent") || texto.includes("percent")) {
-        const lista = dieta.resultado.detalhesPorIngrediente
-            .map(i => `• ${i.nome}: ${i.percentual.toFixed(1)}%`)
-            .join("\n");
-
-        return `📊 *Percentual de cada ingrediente:*\n${lista}`;
-        }
-
-        if (texto.includes("qual ingrediente mais") || texto.includes("mais alto")) {
-        const ordenado = [...dieta.resultado.detalhesPorIngrediente]
-            .sort((a, b) => b.percentual - a.percentual);
-
-        const top = ordenado[0];
-
-        return `📈 *Ingrediente predominante:* ${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
-        } return null;
-        }
-
+        // =================================================
+        // 8) PERGUNTAS SOBRE DIETA ANTERIOR (REGRAS FIXAS)
+        // =================================================
         const respostaDieta = await tentarResponderDieta(phone, texto);
         if (respostaDieta) return sendMessage(phone, respostaDieta);
 
         // =================================================
-        // 8) GPT — fallback final
+        // 8.1 — PERGUNTAS SOBRE DIETA (Assistente Nutricional Inteligente)
+        // =================================================
+        if (isPerguntaDieta(texto)) {
+            const user = await getUser(phone);
+            const dieta = user?.data?.ultima_dieta;
+
+            if (dieta) {
+                const resposta = await processarPerguntaDieta(phone, texto, dieta);
+                return sendMessage(phone, resposta);
+            }
+        }
+
+
+        // =================================================
+        // 9) DIAGNÓSTICO AUTOMÁTICO
+        // =================================================
+        if (msg.length > 35 && !texto.includes("gpt")) {
+            return diagnosticoAnimal(phone, msg);
+        }
+
+
+        // =================================================
+        // 10) GPT — fallback final
         // =================================================
         return respostaGPT(phone, msg);
+
 
     } catch (err) {
 

@@ -24,7 +24,6 @@ Escolha uma opção enviando apenas o número:
 // ===============================
 // SUBMENUS PREMIUM
 // ===============================
-
 export async function mostrarMenuAnimais(phone) {
     const texto = `
 🐮 *MÓDULO ANIMAIS*
@@ -58,11 +57,14 @@ export async function mostrarMenuCalculos(phone) {
     const texto = `
 🥩 *MÓDULO DIETA & CÁLCULOS*
 
-3.1 🍽️ Dieta automatizada  
-3.2 🐂 Custo por arroba  
+3.1 🍽️ Dieta Corte (automática)  
+3.2 🐄 Custo por arroba  
 3.3 🌱 UA (Unidade Animal)  
 3.4 🌾 Lotação UA/ha  
-3.5 🧪 Dieta PRO (MS, PB, NDT, ajuste)
+3.5 🧪 Dieta PRO Corte (MS, PB, NDT)  
+3.6 🍼 Dieta Bezerros (0–8 meses)  
+3.7 🐮 Dieta Recria (8–18 meses)  
+3.8 🥛 Dieta Leite (produção diária)
 
 ⬅️ Digite *menu* para voltar.
 `;
@@ -97,93 +99,51 @@ export async function processarOpcaoMenu(phone, opcao) {
 
     switch (opcao) {
 
-        // ==========================
         // MENU PRINCIPAL
-        // ==========================
-        case "1":
-            return { submenu: "animais" };
+        case "1": return { submenu: "animais" };
+        case "2": return { submenu: "lotes" };
+        case "3": return { submenu: "calculos" };
+        case "4": return { submenu: "diagnostico" };
+        case "5": return { submenu: "gpt" };
 
-        case "2":
-            return { submenu: "lotes" };
-
-        case "3":
-            return { submenu: "calculos" };
-
-        case "4":
-            return { submenu: "diagnostico" };
-
-        case "5":
-            return { submenu: "gpt" };
-
-
-        // ==========================
         // SUBMENU — ANIMAIS
-        // ==========================
-        case "1.1":
-            return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
+        case "1.1": return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
+        case "1.2": return { acao: "listar_animais" };
+        case "1.3": return "📌 Envie:\neditar animal ID\nNome\nRaça\nPeso\nIdade\nNotas";
+        case "1.4": return "📌 Envie: remover animal ID";
 
-        case "1.2":
-            return { acao: "listar_animais" };
-
-        case "1.3":
-            return "📌 Envie: editar animal ID campo novo_valor";
-
-        case "1.4":
-            return "📌 Envie: remover animal ID";
-
-
-        // ==========================
         // SUBMENU — LOTES
-        // ==========================
-        case "2.1":
-            return "📌 Envie: criar lote nome_do_lote";
+        case "2.1": return "📌 Envie: criar lote nome_do_lote";
+        case "2.2": return { acao: "listar_lotes" };
+        case "2.3": return "📌 Envie: adicionar ao lote nome_do_lote id_do_animal";
+        case "2.4": return "📌 Envie: remover do lote nome_do_lote id_do_animal";
+        case "2.5": return "📌 Envie: remover lote nome_do_lote";
 
-        case "2.2":
-            return { acao: "listar_lotes" };
-
-        case "2.3":
-            return "📌 Envie: adicionar ao lote nome_do_lote id_do_animal";
-
-        case "2.4":
-            return "📌 Envie: remover do lote nome_do_lote id_do_animal";
-
-        case "2.5":
-            return "📌 Envie: remover lote nome_do_lote";
-
-
-        // ==========================
-        // SUBMENU — CÁLCULOS
-        // ==========================
+        // SUBMENU — CÁLCULOS & DIETAS
         case "3.1":
-            return "📌 Envie: dieta peso animal ingredientes quantidades";
+            return "📌 Envie: dieta 400 kg\nOu: dieta 400kg";
 
         case "3.2":
-            return "📌 Envie: custo por arroba peso_kg valor_total";
+            return "📌 Envie: custo por arroba 373 kg 2200 reais";
 
         case "3.3":
-            return "📌 Envie: ua peso_kg";
+            return "📌 Envie: ua 450 kg";
 
         case "3.4":
-            return "📌 Envie: lotacao area_ha numero_animais";
+            return "📌 Envie: lotacao 10 ha 20 bois";
 
         case "3.5":
-    return "📘 *Dieta PRO – Envie a dieta no formato:*\n\n" +
-           "dieta 391 kg\n" +
-           "milho 60kg\n" +
-           "soja 30kg\n" +
-           "casca 50kg\n" +
-           "nucleo 10kg";
+            return "📌 *Dieta PRO Corte — Exemplo:*\n\ndieta 391 kg\nmilho 60kg\nsoja 30kg\ncasca 50kg\nnucleo 10kg";
 
-        // ==========================
-        // SUBMENU — DIAGNÓSTICO
-        // ==========================
-        case "4":
-            return "🩺 Envie os sintomas do animal.";
+        case "3.6":
+            return "📌 *Dieta Bezerros — Exemplo:*\ndieta bezerro 120kg";
 
+        case "3.7":
+            return "📌 *Dieta Recria — Exemplo:*\ndieta recria 250kg";
 
-        // ==========================
-        // DEFAULT
-        // ==========================
+        case "3.8":
+            return "📌 *Dieta Leite — Exemplo:*\ndieta leite 550 kg 20 litros";
+
         default:
             return "❌ Opção inválida. Digite *menu*.";
     }
