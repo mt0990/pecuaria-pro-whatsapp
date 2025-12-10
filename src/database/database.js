@@ -44,16 +44,32 @@ export async function createUser(phone, name = null) {
 
 export async function updateUser(phone, fields) {
     try {
+        // Pega usuario atual
+        const { data: user } = await supabase
+            .from("users")
+            .select("data")
+            .eq("phone", phone)
+            .single();
+
+        const novoData = {
+            ...(user?.data || {}),
+            ...(fields.data || {})
+        };
+
+        const enviar = {
+            ...fields,
+            data: novoData
+        };
+
         await supabase
             .from("users")
-            .update(fields)
+            .update(enviar)
             .eq("phone", phone);
 
     } catch (err) {
         logError(err, { section: "updateUser", phone, fields });
     }
 }
-
 
 // ==============================================================
 // 2️⃣ CONVERSATIONS

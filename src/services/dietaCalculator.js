@@ -1,32 +1,28 @@
 // =============================================
-// 🧪 DIETA PROFISSIONAL – Cálculos Técnicos
-// Pecuária Pro — MS, PB, NDT, limites e ajustes
+// 🧪 DIETA PROFISSIONAL – Cálculos Avançados
 // =============================================
 
-// ---------------------------------------------
-// 1) Converter lista de ingredientes do usuário
-// ---------------------------------------------
+// Parser de ingredientes enviados pelo usuário
 export function parseIngredientes(msg) {
     const linhas = msg.split("\n").map(l => l.trim()).filter(Boolean);
 
     const ingredientes = [];
 
     for (const linha of linhas) {
-        const match = linha.match(/([a-zA-Zçãõáéíóú\s]+)\s+(\d+[.,]?\d*)\s?kg/i);
+        const match = linha.match(/([a-zA-Zçãõáéíóú]+)\s+(\d+)\s?kg/i);
         if (!match) continue;
 
         ingredientes.push({
-            nome: match[1].toLowerCase().trim(),
-            quantidade: Number(match[2].replace(",", "."))
+            nome: match[1].toLowerCase(),
+            quantidade: Number(match[2])
         });
     }
 
     return ingredientes;
 }
 
-// ---------------------------------------------
-// 2) Banco nutricional simplificado
-// ---------------------------------------------
+
+// Tabela nutricional base
 const tabelaNutrientes = {
     milho: { ms: 87, pb: 9, ndt: 82 },
     soja: { ms: 89, pb: 46, ndt: 84 },
@@ -37,28 +33,44 @@ const tabelaNutrientes = {
     silagem: { ms: 35, pb: 8, ndt: 62 }
 };
 
-// ---------------------------------------------
-// 3) Cálculo da dieta PRO
-// ---------------------------------------------
+
+// Cálculo principal
 export function calcularDietaProfissional(peso, ingredientes) {
-    const consumoMaximo = peso * 0.03; // 3% PV (peso vivo)
+
+    const consumoMaximo = peso * 0.03; // 3% do PV
     const consumoTotalKg = ingredientes.reduce((s, ing) => s + ing.quantidade, 0);
 
     const alerta = consumoTotalKg > consumoMaximo
-        ? `⚠️ A dieta ultrapassa o limite de *3% do PV* (${consumoMaximo.toFixed(1)} kg).`
+        ? `⚠️ A dieta ultrapassa o limite de *3% do peso vivo* (${consumoMaximo.toFixed(1)} kg).`
         : null;
 
+    // Totais
     let totalMS = 0;
     let totalPB = 0;
     let totalNDT = 0;
+
+    const detalhesPorIngrediente = [];
 
     ingredientes.forEach(ing => {
         const comp = tabelaNutrientes[ing.nome];
         if (!comp) return;
 
-        totalMS += ing.quantidade * (comp.ms / 100);
-        totalPB += ing.quantidade * (comp.pb / 100);
-        totalNDT += ing.quantidade * (comp.ndt / 100);
+        const msKg = ing.quantidade * (comp.ms / 100);
+        const pbKg = ing.quantidade * (comp.pb / 100);
+        const ndtKg = ing.quantidade * (comp.ndt / 100);
+
+        totalMS += msKg;
+        totalPB += pbKg;
+        totalNDT += ndtKg;
+
+        detalhesPorIngrediente.push({
+            nome: ing.nome,
+            quantidade: ing.quantidade,
+            percentual: (ing.quantidade / consumoTotalKg) * 100,
+            msKg,
+            pbKg,
+            ndtKg
+        });
     });
 
     return {
@@ -68,35 +80,48 @@ export function calcularDietaProfissional(peso, ingredientes) {
         totalMS,
         totalPB,
         totalNDT,
-        alerta
+        alerta,
+        detalhesPorIngrediente
     };
 }
 
-// ---------------------------------------------
-// 4) Formatação para WhatsApp
-// ---------------------------------------------
+
+// Formatação final
 export function formatarDietaAPP(resultado, ingredientes) {
-    const lista = ingredientes
-        .map(i => `• ${i.nome} — ${i.quantidade} kg`)
+
+    const lista = resultado.detalhesPorIngrediente
+        .map(i =>
+            `• ${i.nome} — ${i.quantidade} kg (${i.percentual.toFixed(1)}%)`
+        )
+        .join("\n");
+
+    const detalhamentoNutri = resultado.detalhesPorIngrediente
+        .map(i =>
+            `• ${i.nome}: MS ${i.msKg.toFixed(2)} kg, PB ${i.pbKg.toFixed(2)} kg, NDT ${i.ndtKg.toFixed(2)} kg`
+        )
         .join("\n");
 
     return `
-📘 *DIETA PROFISSIONAL — Pecuária Pro*
+📘 *DIETA PROFISSIONAL – Pecuária Pro*
 
 🐮 *Peso:* ${resultado.peso} kg
 
-📦 *Ingredientes:*
+📦 *Ingredientes (% da mistura):*
 ${lista}
 
 ⚖️ *Consumo total:* ${resultado.consumoTotalKg.toFixed(1)} kg  
-📏 *Máximo permitido:* ${resultado.maxPermitido.toFixed(1)} kg
+📏 *Máximo permitido (3% PV):* ${resultado.maxPermitido.toFixed(1)} kg  
 
-🌾 *Nutrientes:*  
+🌾 *Resultados Totais:*  
 • MS: ${resultado.totalMS.toFixed(2)} kg  
 • PB: ${resultado.totalPB.toFixed(2)} kg  
 • NDT: ${resultado.totalNDT.toFixed(2)} kg  
 
+🔬 *Contribuição Nutricional por Ingrediente:*  
+${detalhamentoNutri}
+
 ${resultado.alerta ? "\n" + resultado.alerta + "\n" : ""}
-✔️ Ajuste conforme necessidade.
+
+✔️ Ajuste a dieta conforme objetivo do lote.
 `;
 }

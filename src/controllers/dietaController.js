@@ -1,47 +1,46 @@
 import { 
     parseIngredientes, 
     calcularDietaProfissional, 
-    formatarDietaAPP
+    formatarDietaAPP 
 } from "../services/dietaCalculator.js";
 
 import { sendMessage } from "../services/whatsapp.js";
+import { updateUser, getUser } from "../database/database.js";
 
-// ==============================================
-// 🐮 DIETA PROFISSIONAL – CONTROLADOR OFICIAL
-// ==============================================
 export async function dietaProfissionalController(phone, msg) {
     try {
-        // 1 — Extrair peso vivo
-        const matchPeso = msg.match(/(\d+[.,]?\d*)\s?kg/i);
+        const matchPeso = msg.match(/(\d+)\s?kg/i);
         if (!matchPeso) {
-            return sendMessage(
-                phone,
-                "⚠️ Envie no formato:\n\n*dieta 391 kg*\nseguido dos ingredientes"
-            );
+            return sendMessage(phone, "⚠️ Envie no formato:\n\ndieta 391 kg\nseguido dos ingredientes");
         }
 
-        const peso = Number(matchPeso[1].replace(",", "."));
+        const peso = Number(matchPeso[1]);
 
-        // 2 — Extrair ingredientes
         const ingredientes = parseIngredientes(msg);
-
         if (ingredientes.length === 0) {
-            return sendMessage(
-                phone,
-                "⚠️ Não encontrei ingredientes válidos.\n\nExemplo:\n*dieta 391 kg*\nmilho 60kg\nsoja 30kg\ncasca 40kg\nnucleo 10kg"
-            );
+            return sendMessage(phone, "⚠️ Não encontrei ingredientes válidos.");
         }
 
-        // 3 — Calcular dieta PRO
         const resultado = calcularDietaProfissional(peso, ingredientes);
-
-        // 4 — Resposta final
         const resposta = formatarDietaAPP(resultado, ingredientes);
+
+        // SALVA A DIETA NA MEMÓRIA DO USUÁRIO
+        const user = await getUser(phone);
+        await updateUser(phone, {
+            data: {
+                ...user.data,
+                ultima_dieta: {
+                    peso,
+                    ingredientes,
+                    resultado
+                }
+            }
+        });
 
         return sendMessage(phone, resposta);
 
     } catch (err) {
         console.error(err);
-        return sendMessage(phone, "❌ Erro ao calcular dieta profissional.");
+        return sendMessage(phone, "❌ Erro ao calcular dieta.");
     }
 }

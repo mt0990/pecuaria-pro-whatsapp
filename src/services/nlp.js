@@ -35,6 +35,7 @@ import { sendMessage } from "../services/whatsapp.js";
 import { logInfo, logError } from "../utils/logger.js";
 
 import { dietaProfissionalController } from "../controllers/dietaController.js";
+import { getUser } from "../database/database.js";
 
 
 // =================================================
@@ -144,6 +145,34 @@ export async function processarMensagem(phone, msg) {
         if (msg.length > 25 && !texto.includes("gpt")) {
             return diagnosticoAnimal(phone, msg);
         }
+
+        // Detectar perguntas sobre dieta
+        async function tentarResponderDieta(phone, texto) {
+        const user = await getUser(phone);
+        const dieta = user?.data?.ultima_dieta;
+        if (!dieta) return null;
+
+        // PERGUNTAS COMUNS
+        if (texto.includes("porcent") || texto.includes("percent")) {
+        const lista = dieta.resultado.detalhesPorIngrediente
+            .map(i => `• ${i.nome}: ${i.percentual.toFixed(1)}%`)
+            .join("\n");
+
+        return `📊 *Percentual de cada ingrediente:*\n${lista}`;
+        }
+
+        if (texto.includes("qual ingrediente mais") || texto.includes("mais alto")) {
+        const ordenado = [...dieta.resultado.detalhesPorIngrediente]
+            .sort((a, b) => b.percentual - a.percentual);
+
+        const top = ordenado[0];
+
+        return `📈 *Ingrediente predominante:* ${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
+        } return null;
+        }
+
+        const respostaDieta = await tentarResponderDieta(phone, texto);
+        if (respostaDieta) return sendMessage(phone, respostaDieta);
 
         // =================================================
         // 8) GPT — fallback final
