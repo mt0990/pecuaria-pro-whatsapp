@@ -1,5 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Otimizada)
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Otimizada Final)
 // =============================================
 
 import {
@@ -27,14 +27,13 @@ import {
     deletarLote
 } from "../controllers/loteController.js";
 
-import { calcularDieta, calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
+import { calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
 import { diagnosticoAnimal } from "../controllers/diagnosticoController.js";
 import { respostaGPT } from "./gpt.js";
 
 import { sendMessage } from "../services/whatsapp.js";
 import { logInfo, logError } from "../utils/logger.js";
 
-import { extrairPesoDaMensagem } from "../utils/extract.js";
 import { dietaProfissionalController } from "../controllers/dietaController.js";
 
 
@@ -56,7 +55,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 2) SAUDAÇÕES → Abrir Menu
+        // 2) SAUDAÇÕES
         // =================================================
         const saudacoes = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
         if (saudacoes.includes(texto)) {
@@ -64,7 +63,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 3) NAVEGAÇÃO POR NÚMEROS (1–9)
+        // 3) NAVEGAÇÃO POR NÚMEROS (0–9)
         // =================================================
         if (/^\d$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
@@ -79,17 +78,19 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 4) SUBMENUS (1.1 / 1.2 / etc)
+        // 4) SUBMENUS (1.1 / 1.2 / 2.3 etc)
         // =================================================
         if (/^\d+\.\d+$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
+
             if (r?.acao === "listar_animais") return listarAnimais(phone);
             if (r?.acao === "listar_lotes") return listarLotes(phone);
+
             return r;
         }
 
         // =================================================
-        // 5) COMANDOS DIRETOS — TEXTO
+        // 5) COMANDOS DE TEXTO DIRETO
         // =================================================
         if (texto.startsWith("registrar animal")) return registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return editarAnimal(phone, msg);
@@ -119,30 +120,33 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 6) CÁLCULOS RÁPIDOS
+        // 6) CÁLCULOS RÁPIDOS + DIETA PRO AUTOMÁTICA
         // =================================================
-        if (texto.includes("dieta")) return calcularDieta(phone, msg);
-        if (texto.startsWith("ua")) return calcularUA(phone, msg);
-        if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
-        if (texto.includes("arroba")) return custoPorArroba(phone, msg);
-
-        // =================================================
-        // 7) DIETA PROFISSIONAL (NLP Automático)
-        // =================================================
-        const peso = extrairPesoDaMensagem(msg);
-        if (texto.includes("dieta") && peso && peso > 80 && peso < 2000) {
+        if (texto.includes("dieta")) {
             return dietaProfissionalController(phone, msg);
         }
 
+        if (texto.startsWith("ua")) {
+            return calcularUA(phone, msg);
+        }
+
+        if (texto.includes("lotacao")) {
+            return calcularLotacao(phone, msg);
+        }
+
+        if (texto.includes("arroba")) {
+            return custoPorArroba(phone, msg);
+        }
+
         // =================================================
-        // 8) DIAGNÓSTICO AUTOMÁTICO
+        // 7) DIAGNÓSTICO AUTOMÁTICO
         // =================================================
         if (msg.length > 25 && !texto.includes("gpt")) {
             return diagnosticoAnimal(phone, msg);
         }
 
         // =================================================
-        // 9) GPT — fallback final
+        // 8) GPT — fallback final
         // =================================================
         return respostaGPT(phone, msg);
 
@@ -150,7 +154,8 @@ export async function processarMensagem(phone, msg) {
 
         logError(err, { phone, msg, local: "processarMensagem" });
 
-        return sendMessage(phone,
+        return sendMessage(
+            phone,
             "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."
         );
     }
