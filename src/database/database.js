@@ -83,16 +83,16 @@ export async function addConversation(phone, role, message) {
     }
 }
 
-export async function getConversationHistory(phone, limit = 15) {
+export async function getConversationHistory(phone, limit = 20) {
     try {
         const { data } = await supabase
             .from("conversations")
-            .select("role, message")
+            .select("role, message, created_at")
             .eq("phone", phone)
-            .order("id", { ascending: false })
+            .order("created_at", { ascending: true })  // ORDEM CRONOLÓGICA REAL
             .limit(limit);
 
-        return data?.reverse() || [];
+        return data || [];
 
     } catch (err) {
         logError(err, { section: "getConversationHistory", phone });
