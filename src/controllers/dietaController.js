@@ -1,8 +1,8 @@
 import { 
     parseIngredientes, 
     calcularDietaProfissional, 
-    formatarDietaWpp 
-} from "../services/dietCalculator.js";
+    formatarDietaAPP
+} from "../services/dietaCalculator.js";
 
 import { sendMessage } from "../services/whatsapp.js";
 
@@ -33,11 +33,11 @@ export async function dietaProfissionalController(phone, msg) {
             );
         }
 
-        // 3 — Calcular dieta
+        // 3 — Calcular dieta PRO
         const resultado = calcularDietaProfissional(peso, ingredientes);
 
-        // 4 — Resposta formatada
-        const resposta = formatarDietaWpp(resultado, peso);
+        // 4 — Formatar resposta para WhatsApp
+        const resposta = formatarDietaAPP(resultado, ingredientes);
 
         return sendMessage(phone, resposta);
 
