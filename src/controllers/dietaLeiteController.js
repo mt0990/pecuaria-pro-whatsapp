@@ -29,16 +29,21 @@ dieta vaca leiteira 600 kg 18 litros`);
         const user = await getUser(phone);
 
         await updateUser(phone, {
-            data: {
-                ...user?.data,
-                ultima_dieta: {
-                    tipo: "leite",
-                    peso,
-                    litros,
-                    resultado
-                }
-            }
-        });
+    data: {
+        ...user?.data,
+        ultima_dieta: {
+            tipo: "leite",
+            peso,
+            litros,
+            resultado
+        },
+        contexto: {
+            assunto: "dieta",
+            tipo: "leite",
+            ultima_msg: formatarDietaLeite(resultado)
+        }
+    }
+});
 
         // ================================
         // 🔥 ENVIAR RESPOSTA AO USUÁRIO

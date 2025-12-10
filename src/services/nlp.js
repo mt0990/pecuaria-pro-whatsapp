@@ -1,5 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Final)
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Final Oficial)
 // =============================================
 
 import {
@@ -31,18 +31,18 @@ import { calcularUA, calcularLotacao, custoPorArroba } from "./cattle.js";
 import { diagnosticoAnimal } from "../controllers/diagnosticoController.js";
 import { respostaGPT } from "./gpt.js";
 
-import { sendMessage } from "../services/whatsapp.js";
-import { logInfo, logError } from "../utils/logger.js";
-
 import { dietaProfissionalController } from "../controllers/dietaController.js";
 import { dietaLeiteiraController } from "../controllers/dietaLeiteController.js";
 import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaController.js";
 
 import { getUser } from "../database/database.js";
+import { sendMessage } from "../services/whatsapp.js";
+import { logInfo, logError } from "../utils/logger.js";
 
-// =================================================
-// 🔍 Respostas para perguntas sobre dietas anteriores
-// =================================================
+
+// =============================================
+// 🔍 Dieta Corte — Respostas subsequentes
+// =============================================
 async function tentarResponderDietaCorte(user, texto) {
     const dieta = user?.data?.ultima_dieta;
     if (!dieta?.resultado?.detalhesPorIngrediente) return null;
@@ -53,12 +53,12 @@ async function tentarResponderDietaCorte(user, texto) {
             .map(i => `• ${i.nome}: ${i.percentual.toFixed(1)}%`)
             .join("\n");
 
-        return `📊 *Percentual de cada ingrediente:*\n${lista}`;
+        return `📊 *Percentual dos ingredientes da sua última dieta:*\n\n${lista}`;
     }
 
     // Ingrediente predominante
     if (
-        texto.includes("qual ingrediente mais") ||
+        texto.includes("qual ingrediente") ||
         texto.includes("predominante") ||
         texto.includes("mais alto") ||
         texto.includes("maior")
@@ -68,43 +68,45 @@ async function tentarResponderDietaCorte(user, texto) {
 
         const top = ordenado[0];
 
-        return `📈 *Ingrediente predominante:* ${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
+        return `📈 *Ingrediente predominante:* ${top.nome} (${top.percentual.toFixed(1)}%)`;
     }
 
     return null;
 }
 
 
-// =================================================
-// 🔍 Regras específicas para dieta de vaca leiteira
-// =================================================
+// =============================================
+// 🔍 Dieta Leiteira — Respostas subsequentes
+// =============================================
 async function tentarResponderDietaLeiteira(user, texto) {
     const ultima = user?.data?.ultima_dieta;
     if (!ultima || ultima.tipo !== "leite") return null;
 
+    // Ingredientes recomendados
     if (
         texto.includes("ingred") ||
         texto.includes("ração") ||
-        texto.includes("compos") ||
-        texto.includes("usar")
+        texto.includes("usar") ||
+        texto.includes("compos")
     ) {
         return (
             "🥛 *Ingredientes recomendados para vaca leiteira:*\n\n" +
-            "• Volumoso de qualidade (silagem ou capim picado)\n" +
-            "• Fonte energética (milho moído / polpa cítrica)\n" +
-            "• Proteína (farelo de soja ou ureia protegida)\n" +
-            "• Núcleo mineral específico para leite\n" +
-            "\nAjuste conforme produção e condição corporal."
+            "• Silagem ou capim de boa qualidade\n" +
+            "• Milho moído / polpa cítrica\n" +
+            "• Farelo de soja ou ureia protegida\n" +
+            "• Núcleo mineral para leite\n\n" +
+            "Ajuste conforme produção e condição corporal."
         );
     }
 
+    // Fórmula geral
     if (texto.includes("formula") || texto.includes("cálculo") || texto.includes("como faz")) {
         return (
-            "📐 *Fórmula geral para dieta de vacas leiteiras:*\n\n" +
-            "Consumo de MS (kg/dia) = 3,2% do PV + 0,33 × litros de leite\n" +
-            "Proteína Bruta ideal: 14% a 16%\n" +
-            "NDT recomendado: 32% a 35%\n\n" +
-            "Use volumoso como base e ajuste concentrado conforme produção."
+            "📐 *Fórmula geral para dieta leiteira:*\n\n" +
+            "Consumo MS = 3,2% do PV + 0,33 × litros de leite\n" +
+            "PB ideal = 14% a 16%\n" +
+            "NDT = 32% a 35%\n\n" +
+            "Volumoso como base + concentrado conforme produção."
         );
     }
 
@@ -112,31 +114,33 @@ async function tentarResponderDietaLeiteira(user, texto) {
 }
 
 
-// =================================================
-// 🔍 Bebzerro e Recria – Perguntas pós-dieta
-// =================================================
+// =============================================
+// 🔍 Bezerro / Recria — Respostas subsequentes
+// =============================================
 function tentarResponderBezerroRecria(user, texto) {
     const ultima = user?.data?.ultima_dieta;
     if (!ultima) return null;
 
+    // Bezerro
     if (ultima.tipo === "bezerro" && texto.includes("ingred")) {
         return (
             "🍼 *Ingredientes para bezerros (creep-feeding):*\n\n" +
             "• Fubá de milho\n" +
             "• Farelo de soja\n" +
             "• Núcleo mineral\n" +
-            "• Feno ou capim de boa qualidade\n" +
-            "\nManter oferta ad libitum."
+            "• Feno de boa qualidade\n\n" +
+            "Ofereça ad libitum."
         );
     }
 
+    // Recria
     if (ultima.tipo === "recria" && texto.includes("ingred")) {
         return (
-            "🐮 *Ingredientes recomendados para recria:*\n\n" +
+            "🐮 *Ingredientes para recria:*\n\n" +
             "• Silagem ou capim\n" +
             "• Milho moído\n" +
-            "• Suplemento proteico 20% PB\n" +
-            "• Mineral apropriado\n"
+            "• Suplemento proteico (20% PB)\n" +
+            "• Mineral apropriado"
         );
     }
 
@@ -145,9 +149,9 @@ function tentarResponderBezerroRecria(user, texto) {
 
 
 
-// =================================================
+// =============================================
 // 🔧 FUNÇÃO PRINCIPAL DO NLP
-// =================================================
+// =============================================
 export async function processarMensagem(phone, msg) {
 
     logInfo("📩 Mensagem recebida", { phone, msg });
@@ -155,24 +159,14 @@ export async function processarMensagem(phone, msg) {
     const texto = msg.toLowerCase().trim();
 
     try {
-        // =================================================
-        // 1) MENU PRINCIPAL
-        // =================================================
-        if (/(menu|ajuda|help)/.test(texto)) {
-            return mostrarMenu(phone);
-        }
+        // MENU — sempre disponível
+        if (/(menu|ajuda|help)/.test(texto)) return mostrarMenu(phone);
 
-        // =================================================
-        // 2) SAUDAÇÕES
-        // =================================================
+        // Saudações → abre menu
         const saudacoes = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
-        if (saudacoes.includes(texto)) {
-            return mostrarMenu(phone);
-        }
+        if (saudacoes.includes(texto)) return mostrarMenu(phone);
 
-        // =================================================
-        // 3) NAVEGAÇÃO POR NÚMEROS (0–9)
-        // =================================================
+        // Números do menu
         if (/^\d$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
 
@@ -185,21 +179,18 @@ export async function processarMensagem(phone, msg) {
             return r;
         }
 
-        // =================================================
-        // 4) SUBMENUS (ex: 1.1 / 2.3)
-        // =================================================
+        // Submenus (1.1 / 3.5 etc.)
         if (/^\d+\.\d+$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
-
             if (r?.acao === "listar_animais") return listarAnimais(phone);
             if (r?.acao === "listar_lotes") return listarLotes(phone);
-
             return r;
         }
 
-        // =================================================
-        // 5) COMANDOS DIRETOS
-        // =================================================
+
+        // =============================================
+        // 🔧 COMANDOS DIRETOS / CRUD ANIMAIS & LOTES
+        // =============================================
         if (texto.startsWith("registrar animal")) return registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return editarAnimal(phone, msg);
         if (texto.startsWith("remover animal")) return removerAnimal(phone, msg);
@@ -227,72 +218,70 @@ export async function processarMensagem(phone, msg) {
             return deletarLote(phone, nome);
         }
 
-        // =================================================
-        // 6) DIETAS (Ordem correta)
-        // =================================================
+
+        // =============================================
+        // 🔥 DIETAS — ORDEM CORRETA (não mexer)
+        // =============================================
+
+        // Dieta Leite
         if (texto.includes("dieta") && texto.includes("leite")) {
             return dietaLeiteiraController(phone, msg);
         }
 
-        const rBR = await dietaBezerroRecriaController(phone, msg);
-        if (rBR) return rBR;
+        // Bezerro / Recria
+        const br = await dietaBezerroRecriaController(phone, msg);
+        if (br) return br;
 
+        // Dieta Corte / Dieta PRO
         if (texto.includes("dieta")) {
             return dietaProfissionalController(phone, msg);
         }
 
-        // =================================================
-        // 7) CÁLCULOS RÁPIDOS
-        // =================================================
+
+        // =============================================
+        // Cálculos rápidos
+        // =============================================
         if (texto.startsWith("ua")) return calcularUA(phone, msg);
         if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
         if (texto.includes("arroba")) return custoPorArroba(phone, msg);
 
-        // =================================================
-        // 8) PERGUNTAS SOBRE DIETA SALVA
-        // =================================================
+
+        // =============================================
+        // 🔍 Perguntas sobre dieta salva
+        // =============================================
         const user = await getUser(phone);
 
-        // Dieta Corte
-        const respostaCorte = await tentarResponderDietaCorte(user, texto);
-        if (respostaCorte) return sendMessage(phone, respostaCorte);
+        const r1 = await tentarResponderDietaCorte(user, texto);
+        if (r1) return sendMessage(phone, r1);
 
-        // Dieta Leiteira
-        const respostaLeite = await tentarResponderDietaLeiteira(user, texto);
-        if (respostaLeite) return sendMessage(phone, respostaLeite);
+        const r2 = await tentarResponderDietaLeiteira(user, texto);
+        if (r2) return sendMessage(phone, r2);
 
-        // Bezerro / Recria
-        const respostaBR = tentarResponderBezerroRecria(user, texto);
-        if (respostaBR) return sendMessage(phone, respostaBR);
+        const r3 = tentarResponderBezerroRecria(user, texto);
+        if (r3) return sendMessage(phone, r3);
 
-        // =================================================
-        // 9) DIAGNÓSTICO AUTOMÁTICO (somente com sintomas reais)
-        // =================================================
-        const gatilhosDiagnostico = [
-        "febre", "febril", "doente", "diarreia", "diarréia",
-        "tossindo", "tosse", "lesão", "ferida", "manco", "mancando",
-        "triste", "abatido", "apático", "sem comer", "não come",
-        "magro", "emagrecendo", "isolado", "respiração", "chiado",
-        "inchaço", "inchado", "babando", "muco", "nariz", "olhos"
+
+        // =============================================
+        // 🩺 Diagnóstico — só se houver sintoma real
+        // =============================================
+        const gatilhos = [
+            "febre", "doente", "diarreia", "toss", "ferida",
+            "manco", "mancando", "abatido", "triste", "sem comer",
+            "magro", "peso caindo", "inchado", "chiado", "respiração"
         ];
 
-        const temSintoma = gatilhosDiagnostico.some(s => texto.includes(s));
-
-        // Se tiver palavras de sintomas → diagnóstico
-        if (temSintoma) {
-        return diagnosticoAnimal(phone, msg);
+        if (gatilhos.some(g => texto.includes(g))) {
+            return diagnosticoAnimal(phone, msg);
         }
-        
-        // =================================================
-        // 10) GPT — Fallback final
-        // =================================================
+
+
+        // =============================================
+        // 🤖 GPT — fallback final
+        // =============================================
         return respostaGPT(phone, msg);
 
     } catch (err) {
-        logError(err, { phone, msg, local: "processarMensagem" });
-        return sendMessage(
-            phone,
-            "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."
-        );
+        logError(err, { phone, msg, local: "NLP" });
+        return sendMessage(phone, "⚠️ Ocorreu um erro ao processar sua mensagem.");
     }
 }
