@@ -40,26 +40,15 @@ import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaC
 
 import { getUser } from "../database/database.js";
 
-// NOVO — Assistente Nutricional
-import {
-    isPerguntaDieta,
-    processarPerguntaDieta
-} from "../services/dietAssistant.js";
-
-
 // =================================================
-// Função externa para responder perguntas simples (percentuais e dominante)
+// 🔍 Respostas para perguntas sobre dietas anteriores
 // =================================================
-async function tentarResponderDieta(phone, texto) {
-    const user = await getUser(phone);
+async function tentarResponderDietaCorte(user, texto) {
     const dieta = user?.data?.ultima_dieta;
-
-    if (!dieta) return null;
+    if (!dieta?.resultado?.detalhesPorIngrediente) return null;
 
     // Percentuais
     if (texto.includes("porcent") || texto.includes("percent")) {
-        if (!dieta.resultado?.detalhesPorIngrediente) return null;
-
         const lista = dieta.resultado.detalhesPorIngrediente
             .map(i => `• ${i.nome}: ${i.percentual.toFixed(1)}%`)
             .join("\n");
@@ -67,22 +56,88 @@ async function tentarResponderDieta(phone, texto) {
         return `📊 *Percentual de cada ingrediente:*\n${lista}`;
     }
 
-    // Ingrediente dominante
+    // Ingrediente predominante
     if (
         texto.includes("qual ingrediente mais") ||
         texto.includes("predominante") ||
         texto.includes("mais alto") ||
         texto.includes("maior")
     ) {
-        if (!dieta.resultado?.detalhesPorIngrediente) return null;
-
         const ordenado = [...dieta.resultado.detalhesPorIngrediente]
             .sort((a, b) => b.percentual - a.percentual);
 
         const top = ordenado[0];
 
-        return `📈 *Ingrediente predominante:*  
-${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
+        return `📈 *Ingrediente predominante:* ${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
+    }
+
+    return null;
+}
+
+
+// =================================================
+// 🔍 Regras específicas para dieta de vaca leiteira
+// =================================================
+async function tentarResponderDietaLeiteira(user, texto) {
+    const ultima = user?.data?.ultima_dieta;
+    if (!ultima || ultima.tipo !== "leite") return null;
+
+    if (
+        texto.includes("ingred") ||
+        texto.includes("ração") ||
+        texto.includes("compos") ||
+        texto.includes("usar")
+    ) {
+        return (
+            "🥛 *Ingredientes recomendados para vaca leiteira:*\n\n" +
+            "• Volumoso de qualidade (silagem ou capim picado)\n" +
+            "• Fonte energética (milho moído / polpa cítrica)\n" +
+            "• Proteína (farelo de soja ou ureia protegida)\n" +
+            "• Núcleo mineral específico para leite\n" +
+            "\nAjuste conforme produção e condição corporal."
+        );
+    }
+
+    if (texto.includes("formula") || texto.includes("cálculo") || texto.includes("como faz")) {
+        return (
+            "📐 *Fórmula geral para dieta de vacas leiteiras:*\n\n" +
+            "Consumo de MS (kg/dia) = 3,2% do PV + 0,33 × litros de leite\n" +
+            "Proteína Bruta ideal: 14% a 16%\n" +
+            "NDT recomendado: 32% a 35%\n\n" +
+            "Use volumoso como base e ajuste concentrado conforme produção."
+        );
+    }
+
+    return null;
+}
+
+
+// =================================================
+// 🔍 Bebzerro e Recria – Perguntas pós-dieta
+// =================================================
+function tentarResponderBezerroRecria(user, texto) {
+    const ultima = user?.data?.ultima_dieta;
+    if (!ultima) return null;
+
+    if (ultima.tipo === "bezerro" && texto.includes("ingred")) {
+        return (
+            "🍼 *Ingredientes para bezerros (creep-feeding):*\n\n" +
+            "• Fubá de milho\n" +
+            "• Farelo de soja\n" +
+            "• Núcleo mineral\n" +
+            "• Feno ou capim de boa qualidade\n" +
+            "\nManter oferta ad libitum."
+        );
+    }
+
+    if (ultima.tipo === "recria" && texto.includes("ingred")) {
+        return (
+            "🐮 *Ingredientes recomendados para recria:*\n\n" +
+            "• Silagem ou capim\n" +
+            "• Milho moído\n" +
+            "• Suplemento proteico 20% PB\n" +
+            "• Mineral apropriado\n"
+        );
     }
 
     return null;
@@ -91,7 +146,7 @@ ${top.nome} com ${top.percentual.toFixed(1)}% da mistura.`;
 
 
 // =================================================
-// 🔧 Função principal do NLP
+// 🔧 FUNÇÃO PRINCIPAL DO NLP
 // =================================================
 export async function processarMensagem(phone, msg) {
 
@@ -131,7 +186,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 4) SUBMENUS (1.1 / 2.3 etc)
+        // 4) SUBMENUS (ex: 1.1 / 2.3)
         // =================================================
         if (/^\d+\.\d+$/.test(texto)) {
             const r = await processarOpcaoMenu(phone, texto);
@@ -143,7 +198,7 @@ export async function processarMensagem(phone, msg) {
         }
 
         // =================================================
-        // 5) COMANDOS DIRETOS (texto)
+        // 5) COMANDOS DIRETOS
         // =================================================
         if (texto.startsWith("registrar animal")) return registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return editarAnimal(phone, msg);
@@ -172,23 +227,19 @@ export async function processarMensagem(phone, msg) {
             return deletarLote(phone, nome);
         }
 
-
         // =================================================
         // 6) DIETAS (Ordem correta)
         // =================================================
-
         if (texto.includes("dieta") && texto.includes("leite")) {
             return dietaLeiteiraController(phone, msg);
         }
 
-        if (texto.includes("dieta") && (texto.includes("bezerro") || texto.includes("recria"))) {
-            return dietaBezerroRecriaController(phone, msg);
-        }
+        const rBR = await dietaBezerroRecriaController(phone, msg);
+        if (rBR) return rBR;
 
         if (texto.includes("dieta")) {
             return dietaProfissionalController(phone, msg);
         }
-
 
         // =================================================
         // 7) CÁLCULOS RÁPIDOS
@@ -197,45 +248,22 @@ export async function processarMensagem(phone, msg) {
         if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
         if (texto.includes("arroba")) return custoPorArroba(phone, msg);
 
+        // =================================================
+        // 8) PERGUNTAS SOBRE DIETA SALVA
+        // =================================================
+        const user = await getUser(phone);
 
-        // =================================================
-        // 8) PERGUNTAS SOBRE DIETA ANTERIOR (REGRAS FIXAS)
-        // =================================================
-        const respostaDieta = await tentarResponderDieta(phone, texto);
-        if (respostaDieta) return sendMessage(phone, respostaDieta);
+        // Dieta Corte
+        const respostaCorte = await tentarResponderDietaCorte(user, texto);
+        if (respostaCorte) return sendMessage(phone, respostaCorte);
 
-        // =================================================
-        // 8.1 — PERGUNTAS SOBRE DIETA (Assistente Nutricional Inteligente)
-        // =================================================
-        if (isPerguntaDieta(texto)) {
-            const user = await getUser(phone);
-            const dieta = user?.data?.ultima_dieta;
+        // Dieta Leiteira
+        const respostaLeite = await tentarResponderDietaLeiteira(user, texto);
+        if (respostaLeite) return sendMessage(phone, respostaLeite);
 
-            if (dieta) {
-                const resposta = await processarPerguntaDieta(phone, texto, dieta);
-                return sendMessage(phone, resposta);
-            }
-        }
-        // =================================================
-        // 8) PERGUNTAS SOBRE INGREDIENTES, COMPOSIÇÃO OU RAÇÃO
-        // =================================================
-        const perguntasIngrediente = [
-        "ingrediente",
-        "ração",
-        "racao",
-        "composição",
-        "mistura",
-        "formula",
-        "formulação"
-        ];
-
-        if (perguntasIngrediente.some(p => texto.includes(p))) {
-        return respostaGPT(
-        phone,
-        `O usuário perguntou sobre ingredientes da dieta: "${msg}". 
-        Responda de forma prática, como nutricionista de gado.`
-        );
-        }
+        // Bezerro / Recria
+        const respostaBR = tentarResponderBezerroRecria(user, texto);
+        if (respostaBR) return sendMessage(phone, respostaBR);
 
         // =================================================
         // 9) DIAGNÓSTICO AUTOMÁTICO
@@ -244,17 +272,13 @@ export async function processarMensagem(phone, msg) {
             return diagnosticoAnimal(phone, msg);
         }
 
-
         // =================================================
-        // 10) GPT — fallback final
+        // 10) GPT — Fallback final
         // =================================================
         return respostaGPT(phone, msg);
 
-
     } catch (err) {
-
         logError(err, { phone, msg, local: "processarMensagem" });
-
         return sendMessage(
             phone,
             "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."
