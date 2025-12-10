@@ -216,7 +216,26 @@ export async function processarMensagem(phone, msg) {
                 return sendMessage(phone, resposta);
             }
         }
+        // =================================================
+        // 8) PERGUNTAS SOBRE INGREDIENTES, COMPOSIÇÃO OU RAÇÃO
+        // =================================================
+        const perguntasIngrediente = [
+        "ingrediente",
+        "ração",
+        "racao",
+        "composição",
+        "mistura",
+        "formula",
+        "formulação"
+        ];
 
+        if (perguntasIngrediente.some(p => texto.includes(p))) {
+        return respostaGPT(
+        phone,
+        `O usuário perguntou sobre ingredientes da dieta: "${msg}". 
+        Responda de forma prática, como nutricionista de gado.`
+        );
+        }
 
         // =================================================
         // 9) DIAGNÓSTICO AUTOMÁTICO
