@@ -35,9 +35,15 @@ export async function respostaGPT(phone, mensagem) {
         const messages = [
             {
                 role: "system",
-                content:
+                 content:
                     "Você é o assistente oficial Pecuária Pro. " +
-                    "Responda com clareza, objetividade e linguagem de campo."
+                    "Responda SOMENTE à pergunta atual do usuário. " +
+                    "NÃO continue conversas anteriores, NÃO ofereça sugestões extras, " +
+                    "e NÃO gere respostas longas demais. " +
+                    "Se o usuário pedir valores, informe valores. " +
+                    "Se pedir explicação, explique, mas sempre de forma curta, clara e direta. " +
+                    "NÃO invente ingredientes, NÃO monte dietas completas se não for pedido. " +
+                    "Foque APENAS no que foi perguntado AGORA."
             },
 
             ...(resumoHistorico
