@@ -9,11 +9,10 @@ import { sendMessage } from "../services/whatsapp.js";
 // ==============================================
 // 🐮 DIETA PROFISSIONAL – CONTROLADOR OFICIAL
 // ==============================================
-
 export async function dietaProfissionalController(phone, msg) {
     try {
         // 1 — Extrair peso vivo
-        const matchPeso = msg.match(/(\d+)\s?kg/i);
+        const matchPeso = msg.match(/(\d+[.,]?\d*)\s?kg/i);
         if (!matchPeso) {
             return sendMessage(
                 phone,
@@ -21,7 +20,7 @@ export async function dietaProfissionalController(phone, msg) {
             );
         }
 
-        const peso = Number(matchPeso[1]);
+        const peso = Number(matchPeso[1].replace(",", "."));
 
         // 2 — Extrair ingredientes
         const ingredientes = parseIngredientes(msg);
@@ -36,13 +35,13 @@ export async function dietaProfissionalController(phone, msg) {
         // 3 — Calcular dieta PRO
         const resultado = calcularDietaProfissional(peso, ingredientes);
 
-        // 4 — Formatar resposta para WhatsApp
+        // 4 — Resposta final
         const resposta = formatarDietaAPP(resultado, ingredientes);
 
         return sendMessage(phone, resposta);
 
     } catch (err) {
         console.error(err);
-        return sendMessage(phone, "❌ Erro ao calcular dieta.");
+        return sendMessage(phone, "❌ Erro ao calcular dieta profissional.");
     }
 }

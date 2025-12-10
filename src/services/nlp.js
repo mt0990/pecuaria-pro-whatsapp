@@ -1,7 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO
-// Controla menus, comandos diretos, cálculos,
-// dieta profissional, diagnóstico e GPT.
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (Versão Otimizada)
 // =============================================
 
 import {
@@ -36,130 +34,63 @@ import { respostaGPT } from "./gpt.js";
 import { sendMessage } from "../services/whatsapp.js";
 import { logInfo, logError } from "../utils/logger.js";
 
-import { getUser, updateUser } from "../database/database.js";
-
-// 👉 IMPORTAÇÃO CORRETA DO EXTRACT!
-import { extrairNumero } from "../utils/extract.js";
-
-// Controller da dieta profissional
+import { extrairPesoDaMensagem } from "../utils/extract.js";
 import { dietaProfissionalController } from "../controllers/dietaController.js";
 
 
-// -------------------------------------------
-// FUNÇÃO AUXILIAR — Saudação por horário
-// -------------------------------------------
-function saudacaoPorHorario() {
-    const hora = new Date().getHours();
-    if (hora >= 5 && hora < 12) return "Bom dia";
-    if (hora >= 12 && hora < 18) return "Boa tarde";
-    return "Boa noite";
-}
-
-
-
-// =============================================
-// 🚀 FUNÇÃO PRINCIPAL DO NLP
-// =============================================
+// =================================================
+// 🔧 Função principal do NLP
+// =================================================
 export async function processarMensagem(phone, msg) {
 
     logInfo("📩 Mensagem recebida", { phone, msg });
 
     const texto = msg.toLowerCase().trim();
 
-
-
     try {
-        // -------------------------------------------------------------------
-        // 0 — MENU PRINCIPAL A QUALQUER MOMENTO
-        // -------------------------------------------------------------------
+        // =================================================
+        // 1) MENU PRINCIPAL EM QUALQUER MOMENTO
+        // =================================================
         if (/(menu|ajuda|help)/.test(texto)) {
             return mostrarMenu(phone);
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 1 — SAUDAÇÃO COM CONTINUAÇÃO DE AÇÃO
-        // -------------------------------------------------------------------
-        const saudacoesSimples = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
-
-        if (saudacoesSimples.includes(texto)) {
-
-            const user = await getUser(phone);
-            const ultimaAcao = user?.data?.ultima_acao || null;
-            const nome = user?.name || "";
-            const saudacao = saudacaoPorHorario();
-            const saudacaoNome = nome ? `${saudacao}, ${nome}!` : `${saudacao}!`;
-
-            if (ultimaAcao) {
-                return sendMessage(
-                    phone,
-`${saudacaoNome}
-
-Você deseja continuar de onde parou?
-➡ Última ação pendente: *${ultimaAcao}*
-
-Ou escolha uma opção:
-
-1️⃣ Animais  
-2️⃣ Lotes  
-3️⃣ Cálculos  
-4️⃣ Diagnóstico  
-5️⃣ Falar com o GPT 🤖`
-                );
-            }
-
-            return sendMessage(
-                phone,
-`${saudacaoNome} Como posso ajudar hoje?
-
-1️⃣ Animais  
-2️⃣ Lotes  
-3️⃣ Cálculos  
-4️⃣ Diagnóstico  
-5️⃣ Falar com o GPT 🤖
-
-Digite o número da opção desejada.`
-            );
+        // =================================================
+        // 2) SAUDAÇÕES → Abrir Menu
+        // =================================================
+        const saudacoes = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
+        if (saudacoes.includes(texto)) {
+            return mostrarMenu(phone);
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 2 — NAVEGAÇÃO PELO MENU PRINCIPAL
-        // -------------------------------------------------------------------
+        // =================================================
+        // 3) NAVEGAÇÃO POR NÚMEROS (1–9)
+        // =================================================
         if (/^\d$/.test(texto)) {
-            const resposta = await processarOpcaoMenu(phone, texto);
+            const r = await processarOpcaoMenu(phone, texto);
 
-            if (resposta?.submenu === "animais") return mostrarMenuAnimais(phone);
-            if (resposta?.submenu === "lotes") return mostrarMenuLotes(phone);
-            if (resposta?.submenu === "calculos") return mostrarMenuCalculos(phone);
-            if (resposta?.submenu === "diagnostico") return mostrarMenuDiagnostico(phone);
-            if (resposta?.submenu === "gpt") return mostrarMenuGPT(phone);
+            if (r?.submenu === "animais") return mostrarMenuAnimais(phone);
+            if (r?.submenu === "lotes") return mostrarMenuLotes(phone);
+            if (r?.submenu === "calculos") return mostrarMenuCalculos(phone);
+            if (r?.submenu === "diagnostico") return mostrarMenuDiagnostico(phone);
+            if (r?.submenu === "gpt") return mostrarMenuGPT(phone);
 
-            return resposta;
+            return r;
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 3 — SUBMENUS (1.1, 2.3, 3.4 etc)
-        // -------------------------------------------------------------------
+        // =================================================
+        // 4) SUBMENUS (1.1 / 1.2 / etc)
+        // =================================================
         if (/^\d+\.\d+$/.test(texto)) {
-            const resposta = await processarOpcaoMenu(phone, texto);
-
-            if (resposta?.acao === "listar_animais") return listarAnimais(phone);
-            if (resposta?.acao === "listar_lotes") return listarLotes(phone);
-
-            return resposta;
+            const r = await processarOpcaoMenu(phone, texto);
+            if (r?.acao === "listar_animais") return listarAnimais(phone);
+            if (r?.acao === "listar_lotes") return listarLotes(phone);
+            return r;
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 4 — COMANDOS DIRETOS (texto livre)
-        // -------------------------------------------------------------------
-
+        // =================================================
+        // 5) COMANDOS DIRETOS — TEXTO
+        // =================================================
         if (texto.startsWith("registrar animal")) return registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return editarAnimal(phone, msg);
         if (texto.startsWith("remover animal")) return removerAnimal(phone, msg);
@@ -173,13 +104,13 @@ Digite o número da opção desejada.`
         if (texto === "listar lotes") return listarLotes(phone);
 
         if (texto.startsWith("adicionar ao lote")) {
-            const partes = texto.split(" ");
-            return adicionarAoLote(phone, partes[3], partes[4]);
+            const p = texto.split(" ");
+            return adicionarAoLote(phone, p[3], p[4]);
         }
 
         if (texto.startsWith("remover do lote")) {
-            const partes = texto.split(" ");
-            return removerDoLote(phone, partes[3], partes[4]);
+            const p = texto.split(" ");
+            return removerDoLote(phone, p[3], p[4]);
         }
 
         if (texto.startsWith("remover lote")) {
@@ -187,59 +118,37 @@ Digite o número da opção desejada.`
             return deletarLote(phone, nome);
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 5 — MODOS DE CÁLCULO
-        // -------------------------------------------------------------------
+        // =================================================
+        // 6) CÁLCULOS RÁPIDOS
+        // =================================================
         if (texto.includes("dieta")) return calcularDieta(phone, msg);
-        if (texto.includes("ua ") || texto === "ua") return calcularUA(phone, msg);
+        if (texto.startsWith("ua")) return calcularUA(phone, msg);
         if (texto.includes("lotacao")) return calcularLotacao(phone, msg);
         if (texto.includes("arroba")) return custoPorArroba(phone, msg);
 
-
-
-        // -------------------------------------------------------------------
-        // 5.1 — DIETA PROFISSIONAL (NLP AUTOMÁTICO AVANÇADO)
-        // -------------------------------------------------------------------
-        const pesoDetectado = extrairNumero(msg);
-
-        if (texto.includes("dieta") && pesoDetectado && pesoDetectado > 80 && pesoDetectado < 2000) {
-            logInfo("🍽 Dieta profissional detectada via NLP", { phone, pesoDetectado });
+        // =================================================
+        // 7) DIETA PROFISSIONAL (NLP Automático)
+        // =================================================
+        const peso = extrairPesoDaMensagem(msg);
+        if (texto.includes("dieta") && peso && peso > 80 && peso < 2000) {
             return dietaProfissionalController(phone, msg);
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 5.2 — DIAGNÓSTICO AUTOMÁTICO (Mensagem longa)
-        // -------------------------------------------------------------------
-        const comandosReconhecidos = [
-            "registrar animal", "editar animal", "remover animal",
-            "listar animais", "criar lote", "listar lotes",
-            "adicionar ao lote", "remover do lote", "remover lote",
-            "dieta", "ua", "arroba", "lotacao"
-        ];
-
-        const ehComando = comandosReconhecidos.some(cmd => texto.startsWith(cmd));
-
-        if (!ehComando && msg.length > 25 && !texto.includes("gpt")) {
-            logInfo("🩺 Diagnóstico automático ativado", { phone });
+        // =================================================
+        // 8) DIAGNÓSTICO AUTOMÁTICO
+        // =================================================
+        if (msg.length > 25 && !texto.includes("gpt")) {
             return diagnosticoAnimal(phone, msg);
         }
 
-
-
-        // -------------------------------------------------------------------
-        // 6 — GPT (Fallback final)
-        // -------------------------------------------------------------------
+        // =================================================
+        // 9) GPT — fallback final
+        // =================================================
         return respostaGPT(phone, msg);
 
+    } catch (err) {
 
-
-    } catch (error) {
-
-        logError(error, { phone, msg, local: "processarMensagem" });
+        logError(err, { phone, msg, local: "processarMensagem" });
 
         return sendMessage(phone,
             "⚠️ Ops, ocorreu um erro ao processar sua mensagem. Tente novamente."

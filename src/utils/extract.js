@@ -21,7 +21,7 @@ export function extrairPesoDaMensagem(msg) {
 
 // extrai o segundo número (valor total normalmente)
 export function extrairCustoDaMensagem(msg) {
-    const nums = extrairTodosNumeros(msg);
+    const nums = extrairTodosNumerros(msg);
     return nums.length >= 2 ? nums[1] : null;
 }
 

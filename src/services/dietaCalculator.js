@@ -5,7 +5,6 @@
 
 // ---------------------------------------------
 // 1) Converter lista de ingredientes do usuário
-// Ex: "milho 60kg\nsoja 30kg\ncasca 50kg\nnucleo 10kg"
 // ---------------------------------------------
 export function parseIngredientes(msg) {
     const linhas = msg.split("\n").map(l => l.trim()).filter(Boolean);
@@ -13,23 +12,20 @@ export function parseIngredientes(msg) {
     const ingredientes = [];
 
     for (const linha of linhas) {
-        const match = linha.match(/([a-zA-Zçãõáéíóú]+)\s+(\d+)\s?kg/i);
+        const match = linha.match(/([a-zA-Zçãõáéíóú\s]+)\s+(\d+[.,]?\d*)\s?kg/i);
         if (!match) continue;
 
         ingredientes.push({
-            nome: match[1].toLowerCase(),
-            quantidade: Number(match[2])
+            nome: match[1].toLowerCase().trim(),
+            quantidade: Number(match[2].replace(",", "."))
         });
     }
 
     return ingredientes;
 }
 
-
-
 // ---------------------------------------------
-// 2) Banco simplificado de composição nutricional
-// Valores médios por ingrediente (percentual)
+// 2) Banco nutricional simplificado
 // ---------------------------------------------
 const tabelaNutrientes = {
     milho: { ms: 87, pb: 9, ndt: 82 },
@@ -41,18 +37,15 @@ const tabelaNutrientes = {
     silagem: { ms: 35, pb: 8, ndt: 62 }
 };
 
-
-
 // ---------------------------------------------
-// 3) Cálculo principal da dieta PRO
+// 3) Cálculo da dieta PRO
 // ---------------------------------------------
 export function calcularDietaProfissional(peso, ingredientes) {
-
     const consumoMaximo = peso * 0.03; // 3% PV (peso vivo)
     const consumoTotalKg = ingredientes.reduce((s, ing) => s + ing.quantidade, 0);
 
     const alerta = consumoTotalKg > consumoMaximo
-        ? `⚠️ A dieta ultrapassa o limite de *3% do peso vivo* (${consumoMaximo.toFixed(1)} kg).`
+        ? `⚠️ A dieta ultrapassa o limite de *3% do PV* (${consumoMaximo.toFixed(1)} kg).`
         : null;
 
     let totalMS = 0;
@@ -61,8 +54,7 @@ export function calcularDietaProfissional(peso, ingredientes) {
 
     ingredientes.forEach(ing => {
         const comp = tabelaNutrientes[ing.nome];
-
-        if (!comp) return; // ingrediente não reconhecido
+        if (!comp) return;
 
         totalMS += ing.quantidade * (comp.ms / 100);
         totalPB += ing.quantidade * (comp.pb / 100);
@@ -80,13 +72,10 @@ export function calcularDietaProfissional(peso, ingredientes) {
     };
 }
 
-
-
 // ---------------------------------------------
-// 4) Formatação final para envio no WhatsApp
+// 4) Formatação para WhatsApp
 // ---------------------------------------------
 export function formatarDietaAPP(resultado, ingredientes) {
-
     const lista = ingredientes
         .map(i => `• ${i.nome} — ${i.quantidade} kg`)
         .join("\n");
@@ -94,20 +83,20 @@ export function formatarDietaAPP(resultado, ingredientes) {
     return `
 📘 *DIETA PROFISSIONAL — Pecuária Pro*
 
-🐮 *Peso do animal:* ${resultado.peso} kg
+🐮 *Peso:* ${resultado.peso} kg
 
-📦 *Ingredientes utilizados:*
+📦 *Ingredientes:*
 ${lista}
 
 ⚖️ *Consumo total:* ${resultado.consumoTotalKg.toFixed(1)} kg  
-📏 *Máximo permitido (3% PV):* ${resultado.maxPermitido.toFixed(1)} kg
+📏 *Máximo permitido:* ${resultado.maxPermitido.toFixed(1)} kg
 
-🌾 *Resultados nutricionais:*  
+🌾 *Nutrientes:*  
 • MS: ${resultado.totalMS.toFixed(2)} kg  
 • PB: ${resultado.totalPB.toFixed(2)} kg  
 • NDT: ${resultado.totalNDT.toFixed(2)} kg  
 
 ${resultado.alerta ? "\n" + resultado.alerta + "\n" : ""}
-✔️ Ajuste conforme necessidade nutricional.
+✔️ Ajuste conforme necessidade.
 `;
 }
