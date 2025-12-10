@@ -1,6 +1,6 @@
 // ==============================================================
 // 📦 BANCO DE DADOS — Supabase (PT-BR)
-// Versão final corrigida
+// Versão revisada e totalmente segura
 // ==============================================================
 
 import supabase from "./supabase.js";
@@ -18,7 +18,9 @@ export async function getUser(phone) {
             .eq("phone", phone)
             .single();
 
-        return error ? null : data;
+        if (error) return null;
+        return data;
+
     } catch (err) {
         logError(err, { section: "getUser", phone });
         return null;
@@ -27,12 +29,15 @@ export async function getUser(phone) {
 
 export async function createUser(phone, name = null) {
     try {
-        await supabase.from("users").insert([{
-            phone,
-            name,
-            last_interaction: new Date().toISOString(),
-            data: {}
-        }]);
+        await supabase.from("users").insert([
+            {
+                phone,
+                name,
+                last_interaction: new Date().toISOString(),
+                data: {}   // JSON vazio inicial
+            }
+        ]);
+
     } catch (err) {
         logError(err, { section: "createUser", phone });
     }
@@ -40,6 +45,7 @@ export async function createUser(phone, name = null) {
 
 export async function updateUser(phone, fields) {
     try {
+        // Busca dados atuais para não sobrescrever
         const { data: user } = await supabase
             .from("users")
             .select("data")
@@ -47,16 +53,18 @@ export async function updateUser(phone, fields) {
             .single();
 
         const dataAtual = user?.data || {};
-        const novoData = { ...dataAtual, ...(fields.data || {}) };
+        const novoData = fields.data
+            ? { ...dataAtual, ...fields.data }
+            : dataAtual;
 
-        const enviar = {
+        const envio = {
             ...fields,
             data: novoData
         };
 
         await supabase
             .from("users")
-            .update(enviar)
+            .update(envio)
             .eq("phone", phone);
 
     } catch (err) {
@@ -65,7 +73,7 @@ export async function updateUser(phone, fields) {
 }
 
 // ==============================================================
-// 2️⃣ CONVERSATIONS (corrigido! usa created_at corretamente)
+// 2️⃣ CONVERSATIONS
 // ==============================================================
 
 export async function addConversation(phone, role, message) {
@@ -74,10 +82,10 @@ export async function addConversation(phone, role, message) {
             {
                 phone,
                 role,
-                message
-                // created_at é automático
+                message // created_at é automático
             }
         ]);
+
     } catch (err) {
         logError(err, { section: "addConversation", phone, role, message });
     }
@@ -85,13 +93,14 @@ export async function addConversation(phone, role, message) {
 
 export async function getConversationHistory(phone, limit = 20) {
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("conversations")
             .select("role, message, created_at")
             .eq("phone", phone)
-            .order("created_at", { ascending: true })  // ORDEM CRONOLÓGICA REAL
+            .order("created_at", { ascending: true }) // ordem cronológica correta
             .limit(limit);
 
+        if (error) return [];
         return data || [];
 
     } catch (err) {
@@ -110,10 +119,10 @@ export async function saveDiagnostic(phone, category, payload) {
             {
                 phone,
                 category,
-                data: JSON.stringify(payload)
-                // created_at automático
+                data: JSON.stringify(payload) // grava payload como JSON string
             }
         ]);
+
     } catch (err) {
         logError(err, { section: "saveDiagnostic", phone, category });
     }
@@ -121,12 +130,13 @@ export async function saveDiagnostic(phone, category, payload) {
 
 export async function getDiagnostics(phone) {
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("diagnostics")
             .select("*")
             .eq("phone", phone)
             .order("id", { ascending: false });
 
+        if (error) return [];
         return data || [];
 
     } catch (err) {
@@ -147,19 +157,21 @@ export async function salvarAnimalDB(obj) {
                 created_at: new Date().toISOString()
             }
         ]);
+
     } catch (err) {
-        logError(err, { section: "salvarAnimalDB" });
+        logError(err, { section: "salvarAnimalDB", obj });
     }
 }
 
 export async function getAnimalsByUser(phone) {
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("animals")
             .select("*")
             .eq("phone", phone)
             .order("id", { ascending: true });
 
+        if (error) return [];
         return data || [];
 
     } catch (err) {
@@ -177,7 +189,7 @@ export async function updateAnimalDB(phone, id, updates) {
             .eq("phone", phone);
 
     } catch (err) {
-        logError(err, { section: "updateAnimalDB", id, phone });
+        logError(err, { section: "updateAnimalDB", phone, id });
     }
 }
 
@@ -190,7 +202,7 @@ export async function deleteAnimalDB(phone, id) {
             .eq("phone", phone);
 
     } catch (err) {
-        logError(err, { section: "deleteAnimalDB", id, phone });
+        logError(err, { section: "deleteAnimalDB", phone, id });
     }
 }
 
@@ -203,6 +215,7 @@ export async function createLoteDB(phone, nome) {
         await supabase
             .from("lotes")
             .insert([{ phone, nome }]);
+
     } catch (err) {
         logError(err, { section: "createLoteDB", phone, nome });
     }
@@ -210,11 +223,12 @@ export async function createLoteDB(phone, nome) {
 
 export async function listLotesDB(phone) {
     try {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("lotes")
             .select("*")
             .eq("phone", phone);
 
+        if (error) return [];
         return data || [];
 
     } catch (err) {
@@ -228,8 +242,9 @@ export async function addAnimalToLoteDB(phone, lote_id, animal_id) {
         await supabase.from("lote_animais").insert([
             { lote_id, animal_id }
         ]);
+
     } catch (err) {
-        logError(err, { section: "addAnimalToLoteDB", phone, lote_id });
+        logError(err, { section: "addAnimalToLoteDB", phone, lote_id, animal_id });
     }
 }
 
@@ -242,7 +257,7 @@ export async function removeAnimalFromLoteDB(phone, lote_id, animal_id) {
             .eq("animal_id", animal_id);
 
     } catch (err) {
-        logError(err, { section: "removeAnimalFromLoteDB", lote_id });
+        logError(err, { section: "removeAnimalFromLoteDB", lote_id, animal_id });
     }
 }
 

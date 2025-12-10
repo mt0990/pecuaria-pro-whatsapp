@@ -4,22 +4,18 @@ import {
     formatarDietaAPP 
 } from "../services/dietaCalculator.js";
 
-import { sendMessage } from "../services/whatsapp.js";
 import { updateUser, getUser } from "../database/database.js";
 
 export async function dietaProfissionalController(phone, msg) {
     try {
-        // Proteção para não capturar dietas de outros módulos
         const texto = msg.toLowerCase();
         if (texto.includes("leite") || texto.includes("bezerro") || texto.includes("recria")) {
-            return null; 
+            return null;
         }
 
-        // Captura do peso
         const matchPeso = msg.match(/(\d+)\s?kg/i);
         if (!matchPeso) {
-            return sendMessage(
-                phone,
+            return (
                 "⚠️ Envie no formato:\n\n" +
                 "dieta 391 kg\n" +
                 "milho 60kg\nsoja 30kg\ncasca 40kg\nnucleo 10kg"
@@ -27,12 +23,10 @@ export async function dietaProfissionalController(phone, msg) {
         }
 
         const peso = Number(matchPeso[1]);
-
-        // Captura dos ingredientes
         const ingredientes = parseIngredientes(msg);
+
         if (ingredientes.length === 0) {
-            return sendMessage(
-                phone,
+            return (
                 "⚠️ Não encontrei ingredientes válidos.\n\n" +
                 "Exemplo:\n" +
                 "dieta 391 kg\n" +
@@ -40,11 +34,9 @@ export async function dietaProfissionalController(phone, msg) {
             );
         }
 
-        // Cálculo da dieta PRO
         const resultado = calcularDietaProfissional(peso, ingredientes);
         const resposta = formatarDietaAPP(resultado, ingredientes);
 
-        // Salvar dieta na memória do usuário
         const user = await getUser(phone);
 
         await updateUser(phone, {
@@ -59,10 +51,10 @@ export async function dietaProfissionalController(phone, msg) {
             }
         });
 
-        return sendMessage(phone, resposta);
+        return resposta;
 
     } catch (err) {
         console.error(err);
-        return sendMessage(phone, "❌ Erro ao calcular dieta.");
+        return "❌ Erro ao calcular dieta.";
     }
 }

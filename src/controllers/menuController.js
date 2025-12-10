@@ -1,10 +1,8 @@
-import { sendMessage } from "../services/whatsapp.js";
-
 // ===============================
-// MENU PRINCIPAL
+// MENU PRINCIPAL (RETORNA TEXTO)
 // ===============================
-export async function mostrarMenu(phone) {
-    const texto = `
+export async function mostrarMenu() {
+    return `
 📋 *MENU PRINCIPAL — Pecuária Pro*
 
 Escolha uma opção enviando apenas o número:
@@ -17,15 +15,10 @@ Escolha uma opção enviando apenas o número:
 
 ℹ️ Dica: digite *menu* a qualquer momento.
 `;
-    return sendMessage(phone, texto);
 }
 
-
-// ===============================
-// SUBMENUS PREMIUM
-// ===============================
-export async function mostrarMenuAnimais(phone) {
-    const texto = `
+export async function mostrarMenuAnimais() {
+    return `
 🐮 *MÓDULO ANIMAIS*
 
 1.1 ➕ Registrar animal  
@@ -35,11 +28,10 @@ export async function mostrarMenuAnimais(phone) {
 
 ⬅️ Digite *menu* para voltar.
 `;
-    return sendMessage(phone, texto);
 }
 
-export async function mostrarMenuLotes(phone) {
-    const texto = `
+export async function mostrarMenuLotes() {
+    return `
 📦 *MÓDULO LOTES*
 
 2.1 ➕ Criar lote  
@@ -50,11 +42,10 @@ export async function mostrarMenuLotes(phone) {
 
 ⬅️ Digite *menu* para voltar.
 `;
-    return sendMessage(phone, texto);
 }
 
-export async function mostrarMenuCalculos(phone) {
-    const texto = `
+export async function mostrarMenuCalculos() {
+    return `
 🥩 *MÓDULO DIETA & CÁLCULOS*
 
 3.1 🍽️ Dieta Corte (automática)  
@@ -68,81 +59,59 @@ export async function mostrarMenuCalculos(phone) {
 
 ⬅️ Digite *menu* para voltar.
 `;
-    return sendMessage(phone, texto);
 }
 
-export async function mostrarMenuDiagnostico(phone) {
-    const texto = `
+export async function mostrarMenuDiagnostico() {
+    return `
 🩺 *DIAGNÓSTICO VETERINÁRIO*
 
 Envie sintomas detalhados para análise.
 ⬅️ Digite *menu* para voltar.
 `;
-    return sendMessage(phone, texto);
 }
 
-export async function mostrarMenuGPT(phone) {
-    const texto = `
+export async function mostrarMenuGPT() {
+    return `
 🤖 *ASSISTENTE GPT — Premium*
 
 Envie qualquer pergunta!
 ⬅️ Digite *menu* para voltar.
 `;
-    return sendMessage(phone, texto);
 }
 
-
 // ===============================
-// PROCESSADOR DE OPÇÕES
+// PROCESSADOR DE OPÇÕES (SEM ENVIO)
 // ===============================
 export async function processarOpcaoMenu(phone, opcao) {
-
     switch (opcao) {
-
-        // MENU PRINCIPAL
         case "1": return { submenu: "animais" };
         case "2": return { submenu: "lotes" };
         case "3": return { submenu: "calculos" };
         case "4": return { submenu: "diagnostico" };
         case "5": return { submenu: "gpt" };
 
-        // SUBMENU — ANIMAIS
+        // SUBMENUS — ANIMAIS
         case "1.1": return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
         case "1.2": return { acao: "listar_animais" };
         case "1.3": return "📌 Envie:\neditar animal ID\nNome\nRaça\nPeso\nIdade\nNotas";
         case "1.4": return "📌 Envie: remover animal ID";
 
-        // SUBMENU — LOTES
+        // SUBMENUS — LOTES
         case "2.1": return "📌 Envie: criar lote nome_do_lote";
         case "2.2": return { acao: "listar_lotes" };
         case "2.3": return "📌 Envie: adicionar ao lote nome_do_lote id_do_animal";
         case "2.4": return "📌 Envie: remover do lote nome_do_lote id_do_animal";
         case "2.5": return "📌 Envie: remover lote nome_do_lote";
 
-        // SUBMENU — CÁLCULOS & DIETAS
-        case "3.1":
-            return "📌 Envie: dieta 400 kg\nOu: dieta 400kg";
-
-        case "3.2":
-            return "📌 Envie: custo por arroba 373 kg 2200 reais";
-
-        case "3.3":
-            return "📌 Envie: ua 450 kg";
-
-        case "3.4":
-            return "📌 Envie: lotacao 10 ha 20 bois";
-
-        case "3.5":
-            return "📌 *Dieta PRO Corte — Exemplo:*\n\ndieta 391 kg\nmilho 60kg\nsoja 30kg\ncasca 50kg\nnucleo 10kg";
-
-        case "3.6":
-            return "📌 *Dieta Bezerros — Exemplo:*\ndieta bezerro 120kg";
-
-        case "3.7":
-            return "📌 *Dieta Recria — Exemplo:*\ndieta recria 250kg";
-
-        case "3.8":
-            return "📌 *Dieta Leite — Exemplo:*\ndieta leite 550 kg 20 litros";
+        // CÁLCULOS
+        case "3.1": return "📌 Envie: dieta 400 kg";
+        case "3.2": return "📌 Envie: custo por arroba 373 kg 2200 reais";
+        case "3.3": return "📌 Envie: ua 450 kg";
+        case "3.4": return "📌 Envie: lotacao 10 ha 20 bois";
+        case "3.5": return "📌 Dieta PRO Corte — Exemplo:\ndieta 391 kg\nmilho 60kg\nsoja 30kg\ncasca 50kg\nnucleo 10kg";
+        case "3.6": return "📌 Dieta Bezerros: dieta bezerro 120kg";
+        case "3.7": return "📌 Dieta Recria: dieta recria 250kg";
+        case "3.8": return "📌 Dieta Leite: dieta leite 550 kg 20 litros";
 
         default:
             return "❌ Opção inválida. Digite *menu*.";
