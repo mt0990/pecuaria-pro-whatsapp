@@ -1,11 +1,12 @@
 import supabase from "../database/supabase.js";
+import { logError } from "../utils/logger.js";
 
 // ===============================
 // 🧠 PARSE AUTOMÁTICO
 // ===============================
 function parseAnimalData(text) {
     text = text.replace(/registrar animal/i, "").trim();
-    const partes = text.split(/\s+|\n/).filter(p => p.trim());
+    const partes = text.split(/\s+|\n/).filter(Boolean);
 
     const nome = partes[0] || "SemNome";
     const raca = partes[1] || "Desconhecida";
@@ -42,7 +43,7 @@ export async function registrarAnimal(phone, msg) {
         return "✅ *Animal registrado com sucesso!*";
 
     } catch (err) {
-        console.error(err);
+        logError(err, { local: "registrarAnimal", phone });
         return "❌ *Erro ao registrar animal. Verifique os dados.*";
     }
 }
@@ -60,24 +61,32 @@ export async function listarAnimais(phone) {
 
         if (error) throw error;
 
-        if (!data.length) return "📭 *Você ainda não tem animais cadastrados.*";
+        if (!data.length) {
+            return "📭 *Você ainda não tem animais cadastrados.*";
+        }
+
+        // proteção simples contra mensagens enormes
+        if (data.length > 30) {
+            return `📋 Você possui *${data.length}* animais cadastrados.\n\nDigite *listar animais 1* para ver os primeiros.`;
+        }
 
         let texto = "🐮 *SEUS ANIMAIS:*\n\n";
 
-        data.forEach(a => {
-            texto += `ID: ${a.id}
-Nome: ${a.nome}
-Raça: ${a.raca}
-Peso: ${a.peso || "—"} kg
-Idade: ${a.idade || "—"}
-Notas: ${a.notas || "—"}
----------------------\n`;
-        });
+        for (const a of data) {
+            texto +=
+                `ID: ${a.id}\n` +
+                `Nome: ${a.nome}\n` +
+                `Raça: ${a.raca}\n` +
+                `Peso: ${a.peso || "—"} kg\n` +
+                `Idade: ${a.idade || "—"}\n` +
+                `Notas: ${a.notas || "—"}\n` +
+                "---------------------\n";
+        }
 
         return texto;
 
     } catch (err) {
-        console.error(err);
+        logError(err, { local: "listarAnimais", phone });
         return "❌ *Erro ao listar animais.*";
     }
 }
@@ -87,29 +96,24 @@ Notas: ${a.notas || "—"}
 // ===============================
 export async function editarAnimal(phone, msg) {
     try {
-        const linhas = msg.split("\n").map(l => l.trim()).filter(l => l);
-        if (linhas.length < 2) {
+        const linhas = msg.split("\n").map(l => l.trim()).filter(Boolean);
+
+        const idMatch = linhas[0]?.match(/\d+/);
+        const id = idMatch ? Number(idMatch[0]) : null;
+
+        if (!id) {
             return "⚠️ Formato inválido!\n\nUse:\neditar animal ID\nNome\nRaça\nPeso\nIdade\nNotas";
         }
 
-        const primeiraLinha = linhas[0].split(" ");
-        const id = Number(primeiraLinha[2]);
-        if (!id) return "❌ ID inválido.";
-
-        const nome = linhas[1] || null;
-        const raca = linhas[2] || null;
-        const peso = linhas[3] ? linhas[3].replace(/[^0-9]/g, "") : null;
-        const idade = linhas[4] || null;
-        const notas = linhas.slice(5).join(" ");
-
         const campos = {};
-        if (nome) campos.nome = nome;
-        if (raca) campos.raca = raca;
-        if (peso) campos.peso = Number(peso);
-        if (idade) campos.idade = idade;
-        if (notas) campos.notas = notas;
 
-        if (Object.keys(campos).length === 0) {
+        if (linhas[1]) campos.nome = linhas[1];
+        if (linhas[2]) campos.raca = linhas[2];
+        if (linhas[3]) campos.peso = Number(linhas[3].replace(/\D/g, ""));
+        if (linhas[4]) campos.idade = linhas[4];
+        if (linhas[5]) campos.notas = linhas.slice(5).join(" ");
+
+        if (!Object.keys(campos).length) {
             return "⚠️ Nenhuma informação enviada para atualizar.";
         }
 
@@ -121,10 +125,10 @@ export async function editarAnimal(phone, msg) {
 
         if (error) throw error;
 
-        return `✅ Animal *${id}* atualizado!\nCampos modificados:\n${JSON.stringify(campos, null, 2)}`;
+        return `✅ Animal *${id}* atualizado com sucesso!`;
 
     } catch (err) {
-        console.error(err);
+        logError(err, { local: "editarAnimal", phone });
         return "❌ Erro ao editar animal.";
     }
 }
@@ -134,8 +138,8 @@ export async function editarAnimal(phone, msg) {
 // ===============================
 export async function removerAnimal(phone, msg) {
     try {
-        const partes = msg.split(" ");
-        const id = Number(partes[2]);
+        const idMatch = msg.match(/\d+/);
+        const id = idMatch ? Number(idMatch[0]) : null;
 
         if (!id) return "❌ Envie: remover animal ID";
 
@@ -150,7 +154,7 @@ export async function removerAnimal(phone, msg) {
         return `🗑️ *Animal ${id} removido!*`;
 
     } catch (err) {
-        console.error(err);
+        logError(err, { local: "removerAnimal", phone });
         return "❌ Erro ao remover animal.";
     }
 }

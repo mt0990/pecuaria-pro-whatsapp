@@ -9,7 +9,6 @@ import {
 import supabase from "../database/supabase.js";
 import { logError } from "../utils/logger.js";
 
-
 // ======================================================
 // 📦 Criar Lote
 // ======================================================
@@ -21,10 +20,10 @@ export async function criarLote(phone, nomeLote) {
 
         const { data: existente } = await supabase
             .from("lotes")
-            .select("*")
+            .select("id")
             .eq("phone", phone)
             .eq("nome", nomeLote)
-            .single();
+            .maybeSingle();
 
         if (existente) {
             return `⚠️ O lote *${nomeLote}* já existe.`;
@@ -35,12 +34,10 @@ export async function criarLote(phone, nomeLote) {
         return `📦 Lote *${nomeLote}* criado com sucesso!`;
 
     } catch (err) {
-        logError(err, { section: "criarLote", phone });
+        logError(err, { local: "criarLote", phone });
         return "❌ Erro ao criar lote. Tente novamente.";
     }
 }
-
-
 
 // ======================================================
 // 📋 Listar Lotes
@@ -49,25 +46,26 @@ export async function listarLotes(phone) {
     try {
         const lotes = await listLotesDB(phone);
 
-        if (lotes.length === 0) {
+        if (!lotes.length) {
             return "📭 Você ainda não tem lotes cadastrados.";
         }
 
         let texto = "📦 *SEUS LOTES:*\n\n";
 
-        lotes.forEach(lote => {
-            texto += `• ID: ${lote.id}\n  Nome: ${lote.nome}\n-----------------------\n`;
-        });
+        for (const lote of lotes) {
+            texto +=
+                `• ID: ${lote.id}\n` +
+                `  Nome: ${lote.nome}\n` +
+                "-----------------------\n";
+        }
 
         return texto;
 
     } catch (err) {
-        logError(err, { section: "listarLotes", phone });
+        logError(err, { local: "listarLotes", phone });
         return "❌ Erro ao listar lotes.";
     }
 }
-
-
 
 // ======================================================
 // 🐮 Adicionar Animal ao Lote
@@ -80,10 +78,10 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
 
         const { data: lote } = await supabase
             .from("lotes")
-            .select("*")
+            .select("id")
             .eq("phone", phone)
             .eq("nome", nomeLote)
-            .single();
+            .maybeSingle();
 
         if (!lote) {
             return `❌ Lote *${nomeLote}* não encontrado.`;
@@ -91,10 +89,10 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
 
         const { data: animal } = await supabase
             .from("animals")
-            .select("*")
+            .select("id, nome")
             .eq("phone", phone)
             .eq("id", animalId)
-            .single();
+            .maybeSingle();
 
         if (!animal) {
             return `❌ Animal ID *${animalId}* não encontrado.`;
@@ -102,10 +100,10 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
 
         const { data: existe } = await supabase
             .from("lote_animais")
-            .select("*")
+            .select("id")
             .eq("lote_id", lote.id)
             .eq("animal_id", animalId)
-            .single();
+            .maybeSingle();
 
         if (existe) {
             return `⚠️ O animal já está no lote *${nomeLote}*.`;
@@ -116,12 +114,10 @@ export async function adicionarAoLote(phone, nomeLote, animalId) {
         return `🐮 Animal *${animal.nome}* (ID ${animalId}) adicionado ao lote *${nomeLote}*.`;
 
     } catch (err) {
-        logError(err, { section: "adicionarAoLote", phone });
+        logError(err, { local: "adicionarAoLote", phone });
         return "❌ Erro ao adicionar animal ao lote.";
     }
 }
-
-
 
 // ======================================================
 // ❌ Remover Animal do Lote
@@ -134,13 +130,24 @@ export async function removerDoLote(phone, nomeLote, animalId) {
 
         const { data: lote } = await supabase
             .from("lotes")
-            .select("*")
+            .select("id")
             .eq("phone", phone)
             .eq("nome", nomeLote)
-            .single();
+            .maybeSingle();
 
         if (!lote) {
             return `❌ Lote *${nomeLote}* não encontrado.`;
+        }
+
+        const { data: existe } = await supabase
+            .from("lote_animais")
+            .select("id")
+            .eq("lote_id", lote.id)
+            .eq("animal_id", animalId)
+            .maybeSingle();
+
+        if (!existe) {
+            return `⚠️ Animal ID *${animalId}* não está no lote *${nomeLote}*.`;
         }
 
         await removeAnimalFromLoteDB(phone, lote.id, animalId);
@@ -148,12 +155,10 @@ export async function removerDoLote(phone, nomeLote, animalId) {
         return `❌ Animal ID *${animalId}* removido do lote *${nomeLote}*.`;
 
     } catch (err) {
-        logError(err, { section: "removerDoLote", phone });
+        logError(err, { local: "removerDoLote", phone });
         return "❌ Erro ao remover animal do lote.";
     }
 }
-
-
 
 // ======================================================
 // 🗑️ Deletar Lote
@@ -166,10 +171,10 @@ export async function deletarLote(phone, nomeLote) {
 
         const { data: lote } = await supabase
             .from("lotes")
-            .select("*")
+            .select("id")
             .eq("phone", phone)
             .eq("nome", nomeLote)
-            .single();
+            .maybeSingle();
 
         if (!lote) {
             return `❌ Lote *${nomeLote}* não encontrado.`;
@@ -180,7 +185,7 @@ export async function deletarLote(phone, nomeLote) {
         return `🗑️ Lote *${nomeLote}* deletado com sucesso.`;
 
     } catch (err) {
-        logError(err, { section: "deletarLote", phone });
+        logError(err, { local: "deletarLote", phone });
         return "❌ Erro ao deletar lote.";
     }
 }
