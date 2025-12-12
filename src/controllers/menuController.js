@@ -1,7 +1,7 @@
 // ===============================
 // MENU PRINCIPAL (RETORNA TEXTO)
 // ===============================
-export async function mostrarMenu() {
+export function mostrarMenu() {
     return `
 📋 *MENU PRINCIPAL — Pecuária Pro*
 
@@ -17,7 +17,7 @@ Escolha uma opção enviando apenas o número:
 `;
 }
 
-export async function mostrarMenuAnimais() {
+export function mostrarMenuAnimais() {
     return `
 🐮 *MÓDULO ANIMAIS*
 
@@ -30,7 +30,7 @@ export async function mostrarMenuAnimais() {
 `;
 }
 
-export async function mostrarMenuLotes() {
+export function mostrarMenuLotes() {
     return `
 📦 *MÓDULO LOTES*
 
@@ -44,7 +44,7 @@ export async function mostrarMenuLotes() {
 `;
 }
 
-export async function mostrarMenuCalculos() {
+export function mostrarMenuCalculos() {
     return `
 🥩 *MÓDULO DIETA & CÁLCULOS*
 
@@ -52,16 +52,16 @@ export async function mostrarMenuCalculos() {
 3.2 🐄 Custo por arroba  
 3.3 🌱 UA (Unidade Animal)  
 3.4 🌾 Lotação UA/ha  
-3.5 🧪 Dieta PRO Corte (MS, PB, NDT)  
-3.6 🍼 Dieta Bezerros (0–8 meses)  
-3.7 🐮 Dieta Recria (8–18 meses)  
-3.8 🥛 Dieta Leite (produção diária)
+3.5 🧪 Dieta PRO Corte  
+3.6 🍼 Dieta Bezerros  
+3.7 🐮 Dieta Recria  
+3.8 🥛 Dieta Leite  
 
 ⬅️ Digite *menu* para voltar.
 `;
 }
 
-export async function mostrarMenuDiagnostico() {
+export function mostrarMenuDiagnostico() {
     return `
 🩺 *DIAGNÓSTICO VETERINÁRIO*
 
@@ -70,7 +70,7 @@ Envie sintomas detalhados para análise.
 `;
 }
 
-export async function mostrarMenuGPT() {
+export function mostrarMenuGPT() {
     return `
 🤖 *ASSISTENTE GPT — Premium*
 
@@ -80,9 +80,9 @@ Envie qualquer pergunta!
 }
 
 // ===============================
-// PROCESSADOR DE OPÇÕES (SEM ENVIO)
+// PROCESSADOR DE OPÇÕES (RETORNA)
 // ===============================
-export async function processarOpcaoMenu(phone, opcao) {
+export function processarOpcaoMenu(opcao) {
     switch (opcao) {
         case "1": return { submenu: "animais" };
         case "2": return { submenu: "lotes" };
@@ -90,25 +90,22 @@ export async function processarOpcaoMenu(phone, opcao) {
         case "4": return { submenu: "diagnostico" };
         case "5": return { submenu: "gpt" };
 
-        // SUBMENUS — ANIMAIS
-        case "1.1": return "📌 Envie no formato:\nregistrar animal nome raça peso idade notas";
+        case "1.1": return "📌 Envie:\nregistrar animal nome raça peso idade notas";
         case "1.2": return { acao: "listar_animais" };
         case "1.3": return "📌 Envie:\neditar animal ID\nNome\nRaça\nPeso\nIdade\nNotas";
         case "1.4": return "📌 Envie: remover animal ID";
 
-        // SUBMENUS — LOTES
         case "2.1": return "📌 Envie: criar lote nome_do_lote";
         case "2.2": return { acao: "listar_lotes" };
         case "2.3": return "📌 Envie: adicionar ao lote nome_do_lote id_do_animal";
         case "2.4": return "📌 Envie: remover do lote nome_do_lote id_do_animal";
         case "2.5": return "📌 Envie: remover lote nome_do_lote";
 
-        // CÁLCULOS
         case "3.1": return "📌 Envie: dieta 400 kg";
         case "3.2": return "📌 Envie: custo por arroba 373 kg 2200 reais";
         case "3.3": return "📌 Envie: ua 450 kg";
         case "3.4": return "📌 Envie: lotacao 10 ha 20 bois";
-        case "3.5": return "📌 Dieta PRO Corte — Exemplo:\ndieta 391 kg\nmilho 60kg\nsoja 30kg\ncasca 50kg\nnucleo 10kg";
+        case "3.5": return "📌 Dieta PRO Corte — veja exemplo no menu";
         case "3.6": return "📌 Dieta Bezerros: dieta bezerro 120kg";
         case "3.7": return "📌 Dieta Recria: dieta recria 250kg";
         case "3.8": return "📌 Dieta Leite: dieta leite 550 kg 20 litros";

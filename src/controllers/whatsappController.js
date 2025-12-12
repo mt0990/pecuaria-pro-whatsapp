@@ -3,7 +3,6 @@ import { sendMessage } from "../services/whatsapp.js";
 import { usuarioExiste, registrarUser } from "./userController.js";
 import { mensagemBoasVindas } from "../utils/welcome.js";
 import { mostrarMenu } from "./menuController.js";
-
 import { addConversation } from "../database/database.js";
 import { logInfo, logError } from "../utils/logger.js";
 
@@ -11,54 +10,45 @@ export async function handleIncoming(req, res, next) {
     try {
         const { data } = req.body;
 
-        if (!data) {
-            return res.status(400).json({ error: "Payload inválido" });
+        if (!data?.from || !data?.body) {
+            return res.sendStatus(200);
         }
 
         const phone = data.from;
-        const mensagem = (data.body || "").trim();
+        const mensagem = data.body.trim();
 
         logInfo("📩 Mensagem recebida", { phone, mensagem });
 
-        // ======================================================
-        // 1️⃣ SALVAR MENSAGEM DO USUÁRIO
-        // ======================================================
+        // 1️⃣ Salvar mensagem do usuário
         await addConversation(phone, "user", mensagem);
 
-        // ======================================================
-        // 2️⃣ Verificar se usuário é novo
-        // ======================================================
+        // 2️⃣ Verificar se usuário existe
         const existe = await usuarioExiste(phone);
+
+        let respostaFinal = null;
 
         if (!existe) {
             await registrarUser(phone);
 
-            await addConversation(phone, "assistant", mensagemBoasVindas());
-            await sendMessage(phone, mensagemBoasVindas());
-
-            await addConversation(phone, "assistant", "menu inicial");
-            await mostrarMenu(phone);
-
-            return res.status(200).json({ status: "ok" });
+            respostaFinal =
+                mensagemBoasVindas() +
+                "\n\n" +
+                mostrarMenu();
+        } else {
+            // 3️⃣ Processar NLP
+            respostaFinal = await processarMensagem(phone, mensagem);
         }
 
-        // ======================================================
-        // 3️⃣ Processamento normal (NLP)
-        // ======================================================
-        const resposta = await processarMensagem(phone, mensagem);
-
-        // Caso o NLP retorne string (resposta direta)
-        if (resposta && typeof resposta === "string") {
-            // salvar resposta do assistente
-            await addConversation(phone, "assistant", resposta);
-
-            await sendMessage(phone, resposta);
+        // 4️⃣ ENVIO CENTRALIZADO (ÚNICO LUGAR)
+        if (typeof respostaFinal === "string" && respostaFinal.trim()) {
+            await addConversation(phone, "assistant", respostaFinal);
+            await sendMessage(phone, respostaFinal);
         }
 
-        return res.status(200).json({ status: "ok" });
+        return res.sendStatus(200);
 
     } catch (err) {
         logError(err, { local: "handleIncoming" });
-        next(err);
+        return res.sendStatus(200);
     }
 }
