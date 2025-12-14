@@ -2,29 +2,30 @@ import supabase from "../database/supabase.js";
 import { logError } from "../utils/logger.js";
 
 // ===============================
-// 🧠 PARSE AUTOMÁTICO
+// 🧠 PARSE AUTOMÁTICO (DEFENSIVO)
 // ===============================
 function parseAnimalData(text) {
-    text = text.replace(/registrar animal/i, "").trim();
-    const partes = text.split(/\s+|\n/).filter(Boolean);
+    if (typeof text !== "string") {
+        return null;
+    }
 
-    const nome = partes[0] || "SemNome";
-    const raca = partes[1] || "Desconhecida";
-
-    const pesoMatch = text.match(/(\d{2,4})\s*(kg|quilo|kilo)?/i);
-    const peso = pesoMatch ? Number(pesoMatch[1]) : null;
-
-    const idadeMatch = text.match(/\d+\s*(ano|anos|m[eê]s|meses|dia|dias)/i);
-    const idade = idadeMatch ? idadeMatch[0] : null;
-
-    const notas = text
-        .replace(nome, "")
-        .replace(raca, "")
-        .replace(pesoMatch?.[0] || "", "")
-        .replace(idadeMatch?.[0] || "", "")
+    const cleaned = text
+        .toLowerCase()
+        .replace(/,/g, ".")
+        .replace(/[^\w\s.]/g, "")
         .trim();
 
-    return { nome, raca, peso, idade, notas };
+    if (!cleaned) return null;
+
+    const parts = cleaned.split(/\s+/);
+
+    return {
+        nome: parts[2] || null,
+        raca: parts[3] || null,
+        peso: Number(parts[4]) || null,
+        idade: Number(parts[5]) || null,
+        notas: null
+    };
 }
 
 // ===============================
@@ -32,7 +33,14 @@ function parseAnimalData(text) {
 // ===============================
 export async function registrarAnimal(phone, msg) {
     try {
-        const { nome, raca, peso, idade, notas } = parseAnimalData(msg);
+        const dados = parseAnimalData(msg);
+
+        // 🔒 VALIDAÇÃO OBRIGATÓRIA
+        if (!dados || !dados.peso) {
+            return "❌ Dados inválidos.\nExemplo:\nregistrar animal boi nelore 450 24";
+        }
+
+        const { nome, raca, peso, idade, notas } = dados;
 
         const { error } = await supabase
             .from("animals")
@@ -61,11 +69,11 @@ export async function listarAnimais(phone) {
 
         if (error) throw error;
 
-        if (!data.length) {
+        if (!data || !data.length) {
             return "📭 *Você ainda não tem animais cadastrados.*";
         }
 
-        // proteção simples contra mensagens enormes
+        // proteção contra mensagens longas
         if (data.length > 30) {
             return `📋 Você possui *${data.length}* animais cadastrados.\n\nDigite *listar animais 1* para ver os primeiros.`;
         }
@@ -75,8 +83,8 @@ export async function listarAnimais(phone) {
         for (const a of data) {
             texto +=
                 `ID: ${a.id}\n` +
-                `Nome: ${a.nome}\n` +
-                `Raça: ${a.raca}\n` +
+                `Nome: ${a.nome || "—"}\n` +
+                `Raça: ${a.raca || "—"}\n` +
                 `Peso: ${a.peso || "—"} kg\n` +
                 `Idade: ${a.idade || "—"}\n` +
                 `Notas: ${a.notas || "—"}\n` +
@@ -96,7 +104,14 @@ export async function listarAnimais(phone) {
 // ===============================
 export async function editarAnimal(phone, msg) {
     try {
-        const linhas = msg.split("\n").map(l => l.trim()).filter(Boolean);
+        if (typeof msg !== "string") {
+            return "⚠️ Formato inválido.";
+        }
+
+        const linhas = msg
+            .split("\n")
+            .map(l => l.trim())
+            .filter(Boolean);
 
         const idMatch = linhas[0]?.match(/\d+/);
         const id = idMatch ? Number(idMatch[0]) : null;
@@ -138,7 +153,7 @@ export async function editarAnimal(phone, msg) {
 // ===============================
 export async function removerAnimal(phone, msg) {
     try {
-        const idMatch = msg.match(/\d+/);
+        const idMatch = typeof msg === "string" ? msg.match(/\d+/) : null;
         const id = idMatch ? Number(idMatch[0]) : null;
 
         if (!id) return "❌ Envie: remover animal ID";

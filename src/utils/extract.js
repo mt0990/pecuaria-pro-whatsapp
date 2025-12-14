@@ -2,14 +2,19 @@
 // 🔍 FUNÇÕES DE EXTRAÇÃO — VERSÃO INTELIGENTE
 // =============================================
 
-// extrai TODOS os números da mensagem (com vírgula ou ponto)
+// extrai TODOS os números da mensagem (aceita vírgula ou ponto)
 export function extrairTodosNumeros(msg) {
-    if (!msg) return [];
+    if (typeof msg !== "string") return [];
+
     const encontrados = msg.match(/\d+[.,]?\d*/g);
     if (!encontrados) return [];
 
     return encontrados.map(n =>
-        Number(n.replace(/\./g, "").replace(",", "."))
+        Number(
+            n
+                .replace(/\./g, "") // remove separador de milhar
+                .replace(",", ".")  // normaliza decimal
+        )
     );
 }
 
@@ -19,9 +24,9 @@ export function extrairPesoDaMensagem(msg) {
     return nums.length >= 1 ? nums[0] : null;
 }
 
-// extrai o segundo número (valor total normalmente)
+// extrai o segundo número da frase (custo normalmente)
 export function extrairCustoDaMensagem(msg) {
-    const nums = extrairTodosNumerros(msg);
+    const nums = extrairTodosNumeros(msg);
     return nums.length >= 2 ? nums[1] : null;
 }
 
