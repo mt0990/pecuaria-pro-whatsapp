@@ -6,6 +6,8 @@ import whatsappRoutes from "./routes/whatsapp.routes.js";
 import errorHandler from "./utils/errorHandler.js";
 import { config } from "./config/env.js";
 import { logInfo, logError } from "./utils/logger.js";
+import { metrics } from "./utils/metrics.js";
+
 
 // =============================================
 // 🚀 INÍCIO DO SISTEMA
@@ -31,6 +33,30 @@ app.use((req, res, next) => {
         logError("❗ Webhook POST recebido sem body", { path: req.path });
     }
     next();
+});
+
+// =============================================
+// ❤️ HEALTHCHECK / MONITORAMENTO
+// =============================================
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        service: "Pecuária Pro WhatsApp Bot",
+        environment: config.NODE_ENV || "production",
+        uptime_seconds: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString()
+    });
+});
+
+// =============================================
+// 📊 MÉTRICAS INTERNAS (ADMIN)
+// =============================================
+app.get("/metrics", (req, res) => {
+    res.json({
+        mensagens: metrics.mensagens,
+        erros: metrics.erros,
+        ultimas: metrics.ultimas
+    });
 });
 
 // =============================================

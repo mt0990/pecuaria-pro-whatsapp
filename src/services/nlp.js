@@ -39,16 +39,21 @@ import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaC
 import { getUser } from "../database/database.js";
 import { logInfo, logError } from "../utils/logger.js";
 
+import { registrarMensagem } from "../utils/metrics.js";
+
 // =============================================
 // 🔧 FUNÇÃO PRINCIPAL DO NLP
 // =============================================
 export async function processarMensagem(phone, msg) {
 
+    registrarMensagem(phone, msg);
+    
     logInfo("📩 NLP processando mensagem", { phone, msg });
 
     const texto = msg.toLowerCase().trim();
 
     try {
+        
 
         // MENU — SEMPRE DISPONÍVEL
         if (/(menu|ajuda|help)/.test(texto)) {
