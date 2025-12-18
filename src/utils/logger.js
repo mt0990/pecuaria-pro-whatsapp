@@ -26,7 +26,7 @@ function writeLog(file, payload) {
         }
     });
 
-    // sempre aparece no Render
+    // aparece no Render
     console.log(logLine);
 }
 
@@ -42,9 +42,14 @@ export function logInfo(message, context = {}) {
 }
 
 // ===============================
-// ❌ ERROR (defensivo)
+// ❌ ERROR (ÚNICA E CORRETA)
 // ===============================
 export function logError(error, context = {}) {
+    // registra métrica (não quebra se falhar)
+    try {
+        registrarErro();
+    } catch (_) {}
+
     writeLog("error.log", {
         level: "error",
         message:
@@ -65,17 +70,6 @@ export function logEvent(event, context = {}) {
     writeLog("events.log", {
         level: "event",
         event,
-        context
-    });
-}
-
-export function logError(error, context = {}) {
-    registrarErro();
-
-    writeLog("error.log", {
-        time: new Date().toISOString(),
-        message: error.message || error,
-        stack: error.stack,
         context
     });
 }
