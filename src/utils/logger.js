@@ -26,7 +26,7 @@ function writeLog(file, payload) {
         }
     });
 
-    // aparece no Render
+    // sempre aparece no Render
     console.log(logLine);
 }
 
@@ -42,13 +42,15 @@ export function logInfo(message, context = {}) {
 }
 
 // ===============================
-// ❌ ERROR (ÚNICA E CORRETA)
+// ❌ ERROR (único e definitivo)
 // ===============================
 export function logError(error, context = {}) {
-    // registra métrica (não quebra se falhar)
+    // métrica de erro
     try {
         registrarErro();
-    } catch (_) {}
+    } catch (_) {
+        // nunca deixa métricas quebrarem o app
+    }
 
     writeLog("error.log", {
         level: "error",
@@ -64,7 +66,7 @@ export function logError(error, context = {}) {
 }
 
 // ===============================
-// 📌 EVENT (negócio / métricas)
+// 📌 EVENT
 // ===============================
 export function logEvent(event, context = {}) {
     writeLog("events.log", {
