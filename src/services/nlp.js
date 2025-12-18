@@ -38,7 +38,6 @@ import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaC
 
 import { getUser } from "../database/database.js";
 import { logInfo, logError } from "../utils/logger.js";
-
 import { registrarMensagem } from "../utils/metrics.js";
 
 // =============================================
@@ -47,26 +46,27 @@ import { registrarMensagem } from "../utils/metrics.js";
 export async function processarMensagem(phone, msg) {
 
     registrarMensagem(phone, msg);
-    
     logInfo("📩 NLP processando mensagem", { phone, msg });
 
     const texto = msg.toLowerCase().trim();
 
     try {
-        
 
-        // MENU — SEMPRE DISPONÍVEL
+        // =============================================
+        // MENU / AJUDA
+        // =============================================
         if (/(menu|ajuda|help)/.test(texto)) {
             return mostrarMenu();
         }
 
-        // SAUDAÇÕES → MENU
         const saudacoes = ["oi", "ola", "olá", "opa", "eae", "bom dia", "boa tarde", "boa noite"];
         if (saudacoes.includes(texto)) {
             return mostrarMenu();
         }
 
-        // MENU PRINCIPAL (NÚMEROS)
+        // =============================================
+        // MENUS NUMÉRICOS
+        // =============================================
         if (/^\d$/.test(texto)) {
             const r = processarOpcaoMenu(texto);
 
@@ -79,23 +79,24 @@ export async function processarMensagem(phone, msg) {
             return r;
         }
 
-        // SUBMENUS (1.1 / 3.5 etc.)
         if (/^\d+\.\d+$/.test(texto)) {
             const r = processarOpcaoMenu(texto);
-
             if (r?.acao === "listar_animais") return await listarAnimais(phone);
             if (r?.acao === "listar_lotes") return await listarLotes(phone);
-
             return r;
         }
 
+        // =============================================
         // CRUD ANIMAIS
+        // =============================================
         if (texto.startsWith("registrar animal")) return await registrarAnimal(phone, msg);
         if (texto.startsWith("editar animal")) return await editarAnimal(phone, msg);
         if (texto.startsWith("remover animal")) return await removerAnimal(phone, msg);
         if (texto === "listar animais") return await listarAnimais(phone);
 
+        // =============================================
         // LOTES
+        // =============================================
         if (texto.startsWith("criar lote")) {
             const nome = texto.replace("criar lote", "").trim();
             return await criarLote(phone, nome);
@@ -118,7 +119,24 @@ export async function processarMensagem(phone, msg) {
             return await deletarLote(phone, nome);
         }
 
+        // =============================================
+        // 🚑 DIAGNÓSTICO — PRIORIDADE MÁXIMA
+        // =============================================
+        const gatilhos = [
+            "febre", "doente", "diarreia", "tosse", "tossindo",
+            "ferida", "manco", "mancando", "abatido", "triste",
+            "sem comer", "perdeu o apetite", "não come",
+            "magro", "peso caindo", "inchado",
+            "chiado", "respiração", "fraqueza"
+        ];
+
+        if (gatilhos.some(g => texto.includes(g))) {
+            return await diagnosticoAnimal(phone, msg);
+        }
+
+        // =============================================
         // DIETAS
+        // =============================================
         if (texto.includes("dieta") && texto.includes("leite")) {
             return await dietaLeiteiraController(phone, msg);
         }
@@ -130,26 +148,16 @@ export async function processarMensagem(phone, msg) {
             return await dietaProfissionalController(phone, msg);
         }
 
+        // =============================================
         // CÁLCULOS
+        // =============================================
         if (texto.startsWith("ua")) return await calcularUA(phone, msg);
         if (texto.includes("lotacao")) return await calcularLotacao(phone, msg);
         if (texto.includes("arroba")) return await custoPorArroba(phone, msg);
 
-        // DIETA SALVA
-        const user = await getUser(phone);
-
-        // DIAGNÓSTICO
-        const gatilhos = [
-            "febre", "doente", "diarreia", "toss", "ferida",
-            "manco", "mancando", "abatido", "triste", "sem comer",
-            "magro", "peso caindo", "inchado", "chiado", "respiração"
-        ];
-
-        if (gatilhos.some(g => texto.includes(g))) {
-            return await diagnosticoAnimal(phone, msg);
-        }
-
-        // GPT (fallback final)
+        // =============================================
+        // GPT — FALLBACK FINAL
+        // =============================================
         return await respostaGPT(phone, msg);
 
     } catch (err) {
