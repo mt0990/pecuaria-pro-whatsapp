@@ -1,5 +1,5 @@
 // =============================================
-// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (CORRIGIDO)
+// 🤖 NLP PRINCIPAL — PECUÁRIA PRO (FINAL)
 // =============================================
 
 import {
@@ -36,7 +36,6 @@ import { dietaProfissionalController } from "../controllers/dietaController.js";
 import { dietaLeiteiraController } from "../controllers/dietaLeiteController.js";
 import { dietaBezerroRecriaController } from "../controllers/dietaBezerroRecriaController.js";
 
-import { getUser } from "../database/database.js";
 import { logInfo, logError } from "../utils/logger.js";
 import { registrarMensagem } from "../utils/metrics.js";
 
@@ -122,7 +121,7 @@ export async function processarMensagem(phone, msg) {
         // =============================================
         // 🚑 DIAGNÓSTICO — PRIORIDADE MÁXIMA
         // =============================================
-        const gatilhos = [
+        const gatilhosDiagnostico = [
             "febre", "doente", "diarreia", "tosse", "tossindo",
             "ferida", "manco", "mancando", "abatido", "triste",
             "sem comer", "perdeu o apetite", "não come",
@@ -130,8 +129,32 @@ export async function processarMensagem(phone, msg) {
             "chiado", "respiração", "fraqueza"
         ];
 
-        if (gatilhos.some(g => texto.includes(g))) {
+        if (gatilhosDiagnostico.some(g => texto.includes(g))) {
             return await diagnosticoAnimal(phone, msg);
+        }
+
+        // =============================================
+        // 🚑 INTENÇÃO DE PROBLEMA (SEM SINTOMA)
+        // =============================================
+        const intencaoProblema = [
+            "problema",
+            "algo errado",
+            "não está bem",
+            "estranho",
+            "passando mal"
+        ];
+
+        if (intencaoProblema.some(p => texto.includes(p))) {
+            return (
+                "Entendi 👍\n\n" +
+                "Para te ajudar corretamente, me diga *qual sintoma* o animal apresenta.\n\n" +
+                "Exemplos:\n" +
+                "- febre\n" +
+                "- diarreia\n" +
+                "- parou de comer\n" +
+                "- mancando\n" +
+                "- ferida\n"
+            );
         }
 
         // =============================================
