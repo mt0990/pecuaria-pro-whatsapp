@@ -5,8 +5,7 @@ import OpenAI from "openai";
 import { logError, logInfo } from "../utils/logger.js";
 
 import {
-    getConversationHistory,
-    addConversation
+    getConversationHistory
 } from "../database/database.js";
 
 const openai = new OpenAI({
@@ -14,7 +13,8 @@ const openai = new OpenAI({
 });
 
 // ==================================================
-// 🧠 GPT PREMIUM — Com memória otimizada (SEM DUPLICAR MENSAGEM)
+// 🧠 GPT PREMIUM — Com memória otimizada
+// (RESPONDE, MAS NÃO SALVA CONVERSA)
 // ==================================================
 export async function respostaGPT(phone, mensagem) {
     try {
@@ -23,7 +23,7 @@ export async function respostaGPT(phone, mensagem) {
         // 1️⃣ Buscar histórico
         let history = await getConversationHistory(phone);
 
-        // 2️⃣ Limitar ao mais recente
+        // 2️⃣ Limitar histórico
         if (history.length > 20) {
             history = history.slice(history.length - 20);
         }
@@ -35,13 +35,13 @@ export async function respostaGPT(phone, mensagem) {
         const messages = [
             {
                 role: "system",
-                 content:
+                content:
                     "Você é o assistente oficial Pecuária Pro. " +
                     "Responda SOMENTE à pergunta atual do usuário. " +
                     "NÃO continue conversas anteriores, NÃO ofereça sugestões extras, " +
                     "e NÃO gere respostas longas demais. " +
                     "Se o usuário pedir valores, informe valores. " +
-                    "Se pedir explicação, explique, mas sempre de forma curta, clara e direta. " +
+                    "Se pedir explicação, explique de forma curta, clara e direta. " +
                     "NÃO invente ingredientes, NÃO monte dietas completas se não for pedido. " +
                     "Foque APENAS no que foi perguntado AGORA."
             },
@@ -68,10 +68,10 @@ export async function respostaGPT(phone, mensagem) {
         const resposta = completion.choices[0].message.content;
         const respostaFinal = resposta?.trim() || "Não consegui entender a pergunta.";
 
-        // 6️⃣ Salvar histórico
-        await addConversation(phone, "assistant", respostaFinal);
-
-        // 7️⃣ IMPORTANTE: NÃO enviar aqui — apenas retornar
+        // 6️⃣ IMPORTANTE:
+        // ❌ NÃO salvar conversa aqui
+        // ❌ NÃO enviar WhatsApp aqui
+        // ✅ Apenas retornar texto
         return respostaFinal;
 
     } catch (err) {

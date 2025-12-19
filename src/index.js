@@ -8,7 +8,6 @@ import { config } from "./config/env.js";
 import { logInfo, logError } from "./utils/logger.js";
 import { metrics } from "./utils/metrics.js";
 
-
 // =============================================
 // 🚀 INÍCIO DO SISTEMA
 // =============================================
@@ -17,26 +16,55 @@ logInfo("🔄 Iniciando Pecuária Pro WhatsApp Bot...");
 const app = express();
 
 // =============================================
-// 🧩 MIDDLEWARES
+// 🧩 MIDDLEWARES BÁSICOS
 // =============================================
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
-// habilita logs somente em desenvolvimento
+// logs HTTP apenas em desenvolvimento
 if (config.NODE_ENV === "development") {
     app.use(morgan("dev"));
 }
 
-// segurança para evitar requisições ultramsg sem body
+// =============================================
+// 🛡️ PROTEÇÃO CONTRA RESPOSTA DUPLA
+// Detecta quando mais de um fluxo tenta responder
+// =============================================
 app.use((req, res, next) => {
-    if (req.method === "POST" && !req.body) {
-        logError("❗ Webhook POST recebido sem body", { path: req.path });
+    res._sent = false;
+
+    const originalJson = res.json.bind(res);
+
+    res.json = (body) => {
+        if (res._sent) {
+            logError("❌ Tentativa de resposta duplicada ao webhook", {
+                path: req.path,
+                body
+            });
+            return;
+        }
+
+        res._sent = true;
+        return originalJson(body);
+    };
+
+    next();
+});
+
+// =============================================
+// 🔐 SEGURANÇA: POST SEM BODY
+// =============================================
+app.use((req, res, next) => {
+    if (req.method === "POST" && (!req.body || Object.keys(req.body).length === 0)) {
+        logError("❗ Webhook POST recebido sem body", {
+            path: req.path
+        });
     }
     next();
 });
 
 // =============================================
-// ❤️ HEALTHCHECK / MONITORAMENTO
+// ❤️ HEALTHCHECK
 // =============================================
 app.get("/health", (req, res) => {
     res.status(200).json({
@@ -80,7 +108,7 @@ app.listen(config.PORT, () => {
 });
 
 // =============================================
-// 🛑 CAPTURA DE ERROS NÃO TRATADOS
+// 🛑 ERROS NÃO TRATADOS
 // =============================================
 process.on("unhandledRejection", (reason) => {
     logError(reason, { type: "unhandledRejection" });

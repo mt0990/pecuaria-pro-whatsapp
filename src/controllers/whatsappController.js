@@ -6,94 +6,69 @@ import { mostrarMenu } from "./menuController.js";
 import { addConversation } from "../database/database.js";
 import { logInfo, logError } from "../utils/logger.js";
 
-// ==================================================
-// 🔒 Anti-duplicação em memória (mensagens)
-// ==================================================
 const mensagensProcessadas = new Set();
 
-// ==================================================
-// 📩 CONTROLLER PRINCIPAL DO WEBHOOK WHATSAPP
-// ==================================================
 export async function handleIncoming(req, res) {
     try {
         const payload = req.body;
 
-        // ⚠️ Segurança: payload inválido
         if (!payload || !payload.data) {
             return res.sendStatus(200);
         }
 
         const data = payload.data;
 
-        // ==================================================
-        // ✅ FILTRO CRÍTICO — processa SOMENTE mensagem real
-        // ==================================================
         if (
-            data.type !== "chat" ||     // ignora status, ack, etc
-            data.fromMe === true ||     // ignora mensagens do próprio bot
-            !data.from ||               // número inválido
-            !data.body ||               // mensagem vazia
-            !data.id                    // sem ID confiável
+            data.type !== "chat" ||
+            data.fromMe === true ||
+            !data.from ||
+            !data.body ||
+            !data.id
         ) {
             return res.sendStatus(200);
         }
 
         const messageId = data.id;
 
-        // ==================================================
-        // 🚫 DEDUPLICAÇÃO REAL (por messageId)
-        // ==================================================
         if (mensagensProcessadas.has(messageId)) {
             return res.sendStatus(200);
         }
 
         mensagensProcessadas.add(messageId);
-
-        // limpa após 2 minutos (seguro p/ retry)
-        setTimeout(() => {
-            mensagensProcessadas.delete(messageId);
-        }, 120_000);
+        setTimeout(() => mensagensProcessadas.delete(messageId), 120_000);
 
         const phone = data.from;
         const mensagem = data.body.trim();
 
-        logInfo("📩 Mensagem recebida", {
-            phone,
-            mensagem,
-            messageId
-        });
+        logInfo("📩 Mensagem recebida", { phone, mensagem, messageId });
 
-        // ==================================================
-        // 💾 SALVAR MENSAGEM DO USUÁRIO
-        // ==================================================
         await addConversation(phone, "user", mensagem);
 
-        // ==================================================
-        // 👤 VERIFICAR / REGISTRAR USUÁRIO
-        // ==================================================
         const existe = await usuarioExiste(phone);
 
-        let respostaFinal;
+        let resposta;
 
         if (!existe) {
             await registrarUser(phone);
-            respostaFinal =
-                mensagemBoasVindas() +
-                "\n\n" +
-                mostrarMenu();
+            resposta = {
+                type: "reply",
+                text: mensagemBoasVindas() + "\n\n" + mostrarMenu()
+            };
         } else {
-            // ==================================================
-            // 🤖 PROCESSAMENTO NLP (única entrada)
-            // ==================================================
-            respostaFinal = await processarMensagem(phone, mensagem);
+            resposta = await processarMensagem(phone, mensagem);
         }
 
-        // ==================================================
-        // 📤 ENVIO CENTRALIZADO DA RESPOSTA
-        // ==================================================
-        if (typeof respostaFinal === "string" && respostaFinal.trim()) {
-            await addConversation(phone, "assistant", respostaFinal);
-            await sendMessage(phone, respostaFinal);
+        // ===============================
+        // 🔐 CONTRATO DE RESPOSTA
+        // ===============================
+        if (!resposta || typeof resposta !== "object") {
+            logError("❌ NLP retornou resposta inválida", { resposta });
+            return res.sendStatus(200);
+        }
+
+        if (resposta.type === "reply" && resposta.text?.trim()) {
+            await addConversation(phone, "assistant", resposta.text);
+            await sendMessage(phone, resposta.text);
         }
 
         return res.sendStatus(200);
